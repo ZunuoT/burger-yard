@@ -19,7 +19,12 @@ router.post('/', async (req, res) => {
     const { customer, items, orderType, deliveryLocation, specialInstructions, paymentMethod } = req.body;
 
     if (!customer?.name || !customer?.phone || !items?.length || !orderType) {
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
+      console.log('400 Debug - customer:', JSON.stringify(customer), 'items:', items?.length, 'orderType:', orderType);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields',
+        debug: { hasName: !!customer?.name, hasPhone: !!customer?.phone, itemCount: items?.length, hasOrderType: !!orderType }
+      });
     }
 
     const subtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
@@ -80,6 +85,16 @@ router.get('/track/:orderNumber', async (req, res) => {
   }
 });
 
+// Estimated time in seconds for each status stage
+const STAGE_TIMES = {
+  confirmed:  2 * 60,   // 2 min until preparing
+  preparing: 10 * 60,   // 10 min until ready
+  ready:     10 * 60,   // 10 min to collect (pickup) / deliver
+  delivered:  0,
+  cancelled:  0,
+  pending:    1 * 60,   // 1 min to confirm
+};
+
 // PATCH update order status (admin)
 router.patch('/:id/status', protect, async (req, res) => {
   try {
@@ -89,14 +104,24 @@ router.patch('/:id/status', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
 
+    const estimatedSeconds = STAGE_TIMES[status] || 0;
+    const stageStartedAt = new Date();
+
     if (isDBConnected()) {
-      const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+      const order = await Order.findByIdAndUpdate(
+        req.params.id,
+        { status, estimatedTime: Math.round(estimatedSeconds / 60), stageStartedAt },
+        { new: true }
+      );
       if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
       return res.json({ success: true, data: order });
     }
     const order = inMemoryOrders.find(o => o._id === req.params.id);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
     order.status = status;
+    order.estimatedSeconds = estimatedSeconds;
+    order.stageStartedAt = stageStartedAt;
+    order.estimatedTime = Math.round(estimatedSeconds / 60);
     res.json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
