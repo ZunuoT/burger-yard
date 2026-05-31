@@ -9,4 +9,4 @@ const reviewSchema = new mongoose.Schema({
   avatar: { type: String, default: '' },
 }, { timestamps: true });
 
-module.exports = mongoose.model('Review', reviewSchema);
+module.exports = mongoose.models.Review || mongoose.model('Review', reviewSchema);

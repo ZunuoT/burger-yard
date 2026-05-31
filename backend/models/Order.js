@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
 const orderItemSchema = new mongoose.Schema({
-  menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem' },
-  name: String,
-  price: Number,
+  menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: false },
+  name: { type: String, required: true },
+  price: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
   image: String,
 });
@@ -30,6 +30,8 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: { type: String, enum: ['cash', 'momo', 'card'], default: 'cash' },
   paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
   estimatedTime: { type: Number, default: 15 },
+  estimatedSeconds: { type: Number, default: 0 },
+  stageStartedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
 orderSchema.pre('save', async function (next) {
@@ -40,4 +42,4 @@ orderSchema.pre('save', async function (next) {
   next();
 });
 
-module.exports = mongoose.model('Order', orderSchema);
+module.exports = mongoose.models.Order || mongoose.model('Order', orderSchema);
