@@ -34,12 +34,13 @@ const orderSchema = new mongoose.Schema({
   stageStartedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-orderSchema.pre('save', async function (next) {
+// Fix: don't use next() with async pre-save in Mongoose 7+
+orderSchema.pre('save', async function () {
   if (!this.orderNumber) {
-    const count = await mongoose.model('Order').countDocuments();
+    const OrderModel = mongoose.models.Order || mongoose.model('Order', orderSchema);
+    const count = await OrderModel.countDocuments();
     this.orderNumber = `BY-${String(count + 1).padStart(4, '0')}`;
   }
-  next();
 });
 
 module.exports = mongoose.models.Order || mongoose.model('Order', orderSchema);
