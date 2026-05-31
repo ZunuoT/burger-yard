@@ -61,4 +61,36 @@ router.get('/me', protect, (req, res) => {
   res.json({ success: true, user: req.user });
 });
 
+// POST /api/auth/change-password
+router.post('/change-password', protect, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Both current and new password are required' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+    }
+
+    if (isDBConnected()) {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+      const match = await user.comparePassword(currentPassword);
+      if (!match) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+      user.password = newPassword;
+      await user.save();
+      return res.json({ success: true, message: 'Password updated successfully' });
+    }
+
+    // Fallback: check hardcoded admin
+    const match = await bcrypt.compare(currentPassword, ADMIN.password);
+    if (!match) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+    // Update in-memory admin password
+    ADMIN.password = await bcrypt.hash(newPassword, 12);
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

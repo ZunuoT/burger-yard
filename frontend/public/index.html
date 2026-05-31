@@ -362,6 +362,7 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
   <button class="admin-tab active" onclick="showAdminTab('orders')">Orders</button>
   <button class="admin-tab" onclick="showAdminTab('menu')">Menu Items</button>
   <button class="admin-tab" onclick="showAdminTab('reviews')">Reviews</button>
+  <button class="admin-tab" onclick="showAdminTab('settings')">⚙ Settings</button>
   <button class="nav-btn ghost" onclick="adminLogout()" style="margin-left:auto">Logout</button>
 </div>
 
@@ -957,37 +958,56 @@ async function placeOrder() {
 // ── PAYSTACK POPUP ────────────────────────────────────────────
 function launchPaystack(fields) {
   const { name, phone, email, total } = fields;
-  const amountPesewas = Math.round(total * 100); // GH₵ → pesewas
-  const reference = `BY-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const publicKey = window.PAYSTACK_PUBLIC_KEY || '';
 
-  // Get public key — embedded here for frontend use only (safe, not secret key)
-  const publicKey = window.PAYSTACK_PUBLIC_KEY || 'pk_test_YOUR_PUBLIC_KEY';
+  // If no real Paystack key is configured, fall back to saving as cash order
+  if (!publicKey || publicKey === 'pk_test_YOUR_PUBLIC_KEY' || publicKey.includes('YOUR')) {
+    toast('⚠️ Paystack not configured yet — saving as cash order.');
+    saveCashOrder(fields);
+    return;
+  }
 
-  const paystack = new PaystackPop();
-  paystack.newTransaction({
-    key: publicKey,
-    email: email,
-    amount: amountPesewas,
-    currency: 'GHS',
-    ref: reference,
-    label: 'Burger Yard KNUST',
-    metadata: {
-      custom_fields: [
-        { display_name: 'Customer Name', variable_name: 'customer_name', value: name },
-        { display_name: 'Phone', variable_name: 'phone', value: phone },
-        { display_name: 'Order Type', variable_name: 'order_type', value: fields.orderType },
-      ]
-    },
-    onSuccess: async (transaction) => {
-      toast('✅ Payment received! Confirming your order…');
-      setBtnLoading(true);
-      await verifyAndSaveOrder(fields, transaction.reference);
-      setBtnLoading(false);
-    },
-    onCancel: () => {
-      toast('ℹ️ Payment cancelled. Your cart is still saved.');
-    }
-  });
+  // Check PaystackPop is loaded
+  if (typeof PaystackPop === 'undefined') {
+    toast('⚠️ Paystack failed to load — saving as cash order.');
+    saveCashOrder(fields);
+    return;
+  }
+
+  try {
+    const amountPesewas = Math.round(total * 100);
+    const reference = `BY-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+    const paystack = new PaystackPop();
+    paystack.newTransaction({
+      key: publicKey,
+      email: email,
+      amount: amountPesewas,
+      currency: 'GHS',
+      ref: reference,
+      label: 'Burger Yard KNUST',
+      metadata: {
+        custom_fields: [
+          { display_name: 'Customer Name', variable_name: 'customer_name', value: name },
+          { display_name: 'Phone', variable_name: 'phone', value: phone },
+          { display_name: 'Order Type', variable_name: 'order_type', value: fields.orderType },
+        ]
+      },
+      onSuccess: async (transaction) => {
+        toast('✅ Payment received! Confirming your order…');
+        setBtnLoading(true);
+        await verifyAndSaveOrder(fields, transaction.reference);
+        setBtnLoading(false);
+      },
+      onCancel: () => {
+        toast('ℹ️ Payment cancelled. Your cart is still saved.');
+      }
+    });
+  } catch (err) {
+    console.error('Paystack error:', err);
+    toast('⚠️ Payment error — saving as cash order.');
+    saveCashOrder(fields);
+  }
 }
 
 function setBtnLoading(loading) {
@@ -1387,7 +1407,7 @@ let isFirstLoad = true;
 
 function showAdminTab(tab) {
   currentAdminTab = tab;
-  document.querySelectorAll('.admin-tab').forEach((t, i) => t.classList.toggle('active', ['orders','menu','reviews'][i] === tab));
+  document.querySelectorAll('.admin-tab').forEach((t, i) => t.classList.toggle('active', ['orders','menu','reviews','settings'][i] === tab));
   if (tab === 'orders') {
     loadAdminOrders();
     startAutoRefresh();
@@ -1395,6 +1415,7 @@ function showAdminTab(tab) {
     stopAutoRefresh();
     if (tab === 'menu') loadAdminMenu();
     else if (tab === 'reviews') loadAdminReviews();
+    else if (tab === 'settings') loadAdminSettings();
   }
 }
 
@@ -1874,6 +1895,105 @@ const trackObs = new IntersectionObserver(entries => {
   }
 }, { threshold: 0.1 });
 trackObs.observe(document.getElementById('track'));
+
+// ── ADMIN SETTINGS ───────────────────────────────────────────
+function loadAdminSettings() {
+  const con = document.getElementById('admin-content');
+  con.innerHTML = `
+    <div style="max-width:500px">
+      <h3 style="font-family:var(--font-d);font-size:28px;letter-spacing:2px;margin-bottom:.5rem">SETTINGS</h3>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:2.5rem">Manage your admin account settings.</p>
+
+      <!-- Change Password -->
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:1.5rem">
+        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:.4rem">CHANGE PASSWORD</h4>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:1.5rem">Enter your current password then choose a new one.</p>
+
+        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Current Password</label>
+        <input class="fi" type="password" id="pw-current" placeholder="Enter current password" style="margin-bottom:1rem">
+
+        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">New Password</label>
+        <input class="fi" type="password" id="pw-new" placeholder="Enter new password (min 6 characters)" style="margin-bottom:1rem">
+
+        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Confirm New Password</label>
+        <input class="fi" type="password" id="pw-confirm" placeholder="Repeat new password" style="margin-bottom:1.5rem">
+
+        <button class="btn-red" style="width:100%;justify-content:center;padding:14px" onclick="changePassword()">
+          🔒 Update Password
+        </button>
+        <div id="pw-msg" style="margin-top:1rem;font-size:13px;text-align:center"></div>
+      </div>
+
+      <!-- Admin Info -->
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem">
+        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:1.25rem">ADMIN INFO</h4>
+        <div style="font-size:13px;color:var(--gray);margin-bottom:.5rem">Email</div>
+        <div style="font-size:15px;font-weight:600;margin-bottom:1.25rem" id="admin-email-display">admin@burgeryard.com</div>
+        <div style="font-size:13px;color:var(--gray);margin-bottom:.5rem">Role</div>
+        <div style="font-size:15px;font-weight:600;color:var(--yellow)">Admin</div>
+      </div>
+    </div>
+  `;
+
+  // Show current admin email from token
+  try {
+    const payload = JSON.parse(atob(adminToken.split('.')[1]));
+    const el = document.getElementById('admin-email-display');
+    if (el && payload.email) el.textContent = payload.email;
+  } catch {}
+}
+
+async function changePassword() {
+  const current = document.getElementById('pw-current').value;
+  const newPw = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+  const msg = document.getElementById('pw-msg');
+
+  // Validate
+  if (!current || !newPw || !confirm) {
+    msg.style.color = 'var(--red-light)';
+    msg.textContent = '⚠️ Please fill in all fields.';
+    return;
+  }
+  if (newPw.length < 6) {
+    msg.style.color = 'var(--red-light)';
+    msg.textContent = '⚠️ New password must be at least 6 characters.';
+    return;
+  }
+  if (newPw !== confirm) {
+    msg.style.color = 'var(--red-light)';
+    msg.textContent = '⚠️ New passwords do not match.';
+    return;
+  }
+  if (current === newPw) {
+    msg.style.color = 'var(--red-light)';
+    msg.textContent = '⚠️ New password must be different from current password.';
+    return;
+  }
+
+  msg.style.color = 'var(--gray)';
+  msg.textContent = 'Updating…';
+
+  try {
+    const res = await apiFetch('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+    });
+    if (res.success) {
+      msg.style.color = '#4CAF50';
+      msg.textContent = '✅ Password updated successfully!';
+      document.getElementById('pw-current').value = '';
+      document.getElementById('pw-new').value = '';
+      document.getElementById('pw-confirm').value = '';
+    } else {
+      msg.style.color = 'var(--red-light)';
+      msg.textContent = '❌ ' + res.message;
+    }
+  } catch {
+    msg.style.color = 'var(--red-light)';
+    msg.textContent = '❌ Could not update password. Try again.';
+  }
+}
 
 // ── PAYSTACK PUBLIC KEY (safe to expose — never the secret key) ──
 window.PAYSTACK_PUBLIC_KEY = 'pk_test_YOUR_PUBLIC_KEY'; // ← Replace with your real key from paystack.com/dashboard

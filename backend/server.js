@@ -29,6 +29,7 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/payment', require('./routes/payment'));
+app.use('/api/seed', require('./routes/seed'));
 
 
 // Public config — safe to expose (public key only, never secret)
