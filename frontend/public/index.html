@@ -1022,7 +1022,7 @@ async function verifyAndSaveOrder(fields, reference) {
   const { name, phone, orderType, deliveryLocation, specialInstructions, subtotal, deliveryFee, total } = fields;
   const orderData = {
     customer: { name, phone },
-    items: cart.map(i => ({ menuItem: i._id, name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
+    items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
     orderType, deliveryLocation, specialInstructions,
     paymentMethod: 'card', subtotal, deliveryFee, total
   };
@@ -1047,7 +1047,7 @@ async function saveCashOrder(fields) {
   const { name, phone, orderType, deliveryLocation, specialInstructions, subtotal, deliveryFee, total } = fields;
   const orderPayload = {
     customer: { name, phone },
-    items: cart.map(i => ({ menuItem: i._id, name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
+    items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
     orderType, deliveryLocation, specialInstructions,
     paymentMethod: 'cash', subtotal, deliveryFee, total
   };
