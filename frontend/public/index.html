@@ -324,25 +324,6 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
 .paystack-secure{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray);margin-top:.4rem}
 .paystack-secure svg{width:14px;height:14px;fill:var(--gray)}
 
-/* RECEIPT */
-@media print {
-  /* Hide everything except the receipt */
-  body * { visibility: hidden !important; }
-  #receipt-printable, #receipt-printable * { visibility: visible !important; }
-  #receipt-printable {
-    position: fixed !important;
-    top: 0; left: 0;
-    width: 80mm !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    font-size: 12px !important;
-  }
-  /* Thermal printer page settings — 80mm wide, auto height */
-  @page {
-    size: 80mm auto;
-    margin: 3mm 3mm 8mm 3mm;
-  }
-}
 .receipt-btn { background: var(--off-black); color: var(--white); border: 2px solid var(--border); padding: 12px 28px; font-family: var(--font-b); font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 8px; }
 .receipt-btn:hover { border-color: var(--yellow); color: var(--yellow); }
 
@@ -1213,16 +1194,37 @@ function printReceipt(orderNum, name, phone, orderType, total, subtotal, deliver
   `;
 
   // Create hidden print area
-  let printArea = document.getElementById('print-area');
-  if (!printArea) {
-    printArea = document.createElement('div');
-    printArea.id = 'print-area';
-    document.body.appendChild(printArea);
-  }
-  printArea.innerHTML = receiptHTML;
-
-  // Trigger print
-  window.print();
+  // Open receipt in a new popup window for clean printing
+  const printWin = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Receipt - ${orderNum || o.orderNumber}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #fff; }
+        @media print {
+          @page { size: 80mm auto; margin: 3mm 3mm 8mm 3mm; }
+          body { width: 80mm; }
+        }
+        @media screen {
+          body { display: flex; justify-content: center; padding: 20px; background: #f5f5f5; }
+        }
+      </style>
+    </head>
+    <body>
+      ${receiptHTML}
+      <script>
+        window.onload = function() {
+          window.print();
+          window.onafterprint = function() { window.close(); };
+        };
+      <\/script>
+    </body>
+    </html>
+  `);
+  printWin.document.close();
 }
 
 // ── TRACK ORDER ───────────────────────────────────────────────
@@ -1885,14 +1887,10 @@ function printAdminReceipt(o) {
     </div>
   `;
 
-  let printArea = document.getElementById('print-area');
-  if (!printArea) {
-    printArea = document.createElement('div');
-    printArea.id = 'print-area';
-    document.body.appendChild(printArea);
-  }
-  printArea.innerHTML = receiptHTML;
-  window.print();
+  // Open in popup for clean printing
+  const printWin = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+  printWin.document.write('<!DOCTYPE html><html><head><title>Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#fff}@media print{@page{size:80mm auto;margin:3mm 3mm 8mm 3mm}body{width:80mm}}@media screen{body{display:flex;justify-content:center;padding:20px;background:#f5f5f5}}</style></head><body>' + receiptHTML + '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>');
+  printWin.document.close();
 }
 
 async function advanceOrder(id, status, btn) {
