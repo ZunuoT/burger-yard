@@ -5,16 +5,6 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
-// In-memory admin fallback
-const ADMIN = {
-  _id: 'admin_001',
-  name: 'Admin',
-  email: 'admin@burgeryard.com',
-  // password: admin123
-  password: '$2b$12$ADnvBfK3WXv5F9Irszx5vu/sbAHys5xXLzofwCrLzKa4er0QeA4ee',
-  role: 'admin'
-};
-
 const isDBConnected = () => {
   const mongoose = require('mongoose');
   return mongoose.connection.readyState === 1;
@@ -43,14 +33,7 @@ router.post('/login', async (req, res) => {
       return res.json({ success: true, token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
     }
 
-    // Fallback: check hardcoded admin
-    if (email !== ADMIN.email) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-    const match = await bcrypt.compare(password, ADMIN.password);
-    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    const token = signToken(ADMIN);
-    res.json({ success: true, token, user: { id: ADMIN._id, name: ADMIN.name, email: ADMIN.email, role: ADMIN.role } });
+    return res.status(401).json({ success: false, message: 'Invalid credentials' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -71,23 +54,25 @@ router.post('/change-password', protect, async (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
     }
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ success: false, message: 'New password must be different from current password' });
+    }
 
     if (isDBConnected()) {
       const user = await User.findById(req.user.id);
       if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
       const match = await user.comparePassword(currentPassword);
       if (!match) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
-      user.password = newPassword;
-      await user.save();
+
+      // Hash manually to avoid double-hashing from pre-save hook
+      const hashed = await bcrypt.hash(newPassword, 12);
+      await User.findByIdAndUpdate(req.user.id, { password: hashed });
+
       return res.json({ success: true, message: 'Password updated successfully' });
     }
 
-    // Fallback: check hardcoded admin
-    const match = await bcrypt.compare(currentPassword, ADMIN.password);
-    if (!match) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
-    // Update in-memory admin password
-    ADMIN.password = await bcrypt.hash(newPassword, 12);
-    res.json({ success: true, message: 'Password updated successfully' });
+    return res.status(500).json({ success: false, message: 'Database not connected' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

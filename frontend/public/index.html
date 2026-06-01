@@ -365,7 +365,8 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
 <div class="admin-bar" id="admin-bar">
   <span>Admin: <span class="hi" id="admin-name-display">–</span></span>
   <button class="admin-tab active" onclick="showAdminTab('orders')">Orders</button>
-  <button class="admin-tab" onclick="showAdminTab('menu')">Menu Items</button>
+  <button class="admin-tab" onclick="showAdminTab('sales')">📊 Sales</button>
+  <button class="admin-tab" onclick="showAdminTab('menu')">🍔 Menu</button>
   <button class="admin-tab" onclick="showAdminTab('reviews')">Reviews</button>
   <button class="admin-tab" onclick="showAdminTab('settings')">⚙ Settings</button>
   <button class="nav-btn ghost" onclick="adminLogout()" style="margin-left:auto">Logout</button>
@@ -426,7 +427,7 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
     <div class="hero-stats">
       <div><div class="stat-n">5K+</div><div class="stat-l">Burgers Served</div></div>
       <div><div class="stat-n">4.8★</div><div class="stat-l">Rating</div></div>
-      <div><div class="stat-n" id="hero-order-count">0</div><div class="stat-l">Orders Today</div></div>
+      <div id="hero-orders-stat" style="display:none"><div class="stat-n" id="hero-order-count">0</div><div class="stat-l">Orders Today</div></div>
     </div>
   </div>
   <div class="hero-right">
@@ -745,10 +746,9 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
     <div class="m-head"><h3>ADMIN LOGIN</h3><button class="m-close" onclick="closeAdminModal()">×</button></div>
     <div class="m-body">
       <p style="font-size:13px;color:var(--gray);margin-bottom:1.5rem">Enter admin credentials to access the dashboard.</p>
-      <input class="fi" type="email" placeholder="Email" id="a-email" value="admin@burgeryard.com">
-      <input class="fi" type="password" placeholder="Password" id="a-pass" value="admin123">
+      <input class="fi" type="email" placeholder="Email address" id="a-email">
+      <input class="fi" type="password" placeholder="Password" id="a-pass">
       <button class="btn-red" style="width:100%;justify-content:center;padding:14px;margin-top:.5rem" onclick="adminLogin()">Login →</button>
-      <p style="font-size:12px;color:var(--gray);text-align:center;margin-top:1rem">Default: admin@burgeryard.com / admin123</p>
     </div>
   </div>
 </div>
@@ -1111,6 +1111,9 @@ function showOrderSuccess(order, paystackRef) {
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
         <button class="btn-red" onclick="location.reload()">Place Another Order →</button>
       </div>
+      <p style="font-size:12px;color:var(--gray);margin-top:1.5rem">
+        📲 You will receive a WhatsApp confirmation shortly from Burger Yard.
+      </p>
     </div>
   `;
   cart = [];
@@ -1510,6 +1513,7 @@ function adminLogout() {
   document.getElementById('admin-bar').classList.remove('show');
   document.getElementById('admin-panel').classList.remove('show');
   document.getElementById('admin-login-btn').style.display = '';
+  document.getElementById('hero-orders-stat').style.display = 'none';
   document.getElementById('navbar').style.top = '0px';
   toast('Logged out');
 }
@@ -1518,6 +1522,7 @@ function initAdmin() {
   document.getElementById('admin-bar').classList.add('show');
   document.getElementById('admin-panel').classList.add('show');
   document.getElementById('admin-login-btn').style.display = 'none';
+  document.getElementById('hero-orders-stat').style.display = 'block';
   // Push nav below admin bar
   const adminBarH = document.getElementById('admin-bar').offsetHeight || 44;
   document.getElementById('navbar').style.top = adminBarH + 'px';
@@ -1537,13 +1542,14 @@ let isFirstLoad = true;
 
 function showAdminTab(tab) {
   currentAdminTab = tab;
-  document.querySelectorAll('.admin-tab').forEach((t, i) => t.classList.toggle('active', ['orders','menu','reviews','settings'][i] === tab));
+  document.querySelectorAll('.admin-tab').forEach((t, i) => t.classList.toggle('active', ['orders','sales','menu','reviews','settings'][i] === tab));
   if (tab === 'orders') {
     loadAdminOrders();
     startAutoRefresh();
   } else {
     stopAutoRefresh();
-    if (tab === 'menu') loadAdminMenu();
+    if (tab === 'sales') loadSalesReport();
+    else if (tab === 'menu') loadMenuManager();
     else if (tab === 'reviews') loadAdminReviews();
     else if (tab === 'settings') loadAdminSettings();
   }
@@ -1780,6 +1786,15 @@ function buildOrderCard(o) {
         ` : `
           <div style="flex:1;padding:12px;text-align:center;font-size:13px;color:var(--gray);font-weight:600">${stage.label}</div>
         `}
+        <!-- WhatsApp Confirmation Button -->
+        <button
+          onclick="sendWhatsAppConfirmation(${JSON.stringify(o).replace(/"/g,'&quot;')})"
+          style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);color:#25D366;padding:12px 16px;font-family:var(--font-b);font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px"
+          onmouseover="this.style.background='rgba(37,211,102,.2)'"
+          onmouseout="this.style.background='rgba(37,211,102,.1)'"
+          title="Send WhatsApp Confirmation">
+          📲 WhatsApp
+        </button>
         <!-- Print Receipt Button -->
         <button
           onclick="printAdminReceipt(${JSON.stringify(o).replace(/"/g,'&quot;')})"
@@ -2153,6 +2168,19 @@ function loadAdminSettings() {
         <div id="pw-msg" style="margin-top:1rem;font-size:13px;text-align:center"></div>
       </div>
 
+      <!-- Paystack Keys -->
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:1.5rem">
+        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:.4rem">PAYSTACK KEYS</h4>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:1.5rem">Add your Paystack public key to enable card and MoMo payments. Get it from <a href="https://paystack.com/dashboard" target="_blank" style="color:var(--red)">paystack.com/dashboard</a></p>
+        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Public Key</label>
+        <input class="fi" type="text" id="pk-input" placeholder="pk_live_xxxxxxxxxx" style="margin-bottom:1rem">
+        <button class="btn-red" style="width:100%;justify-content:center;padding:12px" onclick="savePaystackKey()">Save Public Key</button>
+        <div id="pk-msg" style="margin-top:.75rem;font-size:12px;text-align:center;color:var(--gray)">
+          Current: <span id="pk-current" style="color:var(--yellow)">Not configured</span>
+        </div>
+        <p style="font-size:11px;color:var(--gray);margin-top:.75rem">⚠️ The secret key must be added in your Render environment variables — never put it here.</p>
+      </div>
+
       <!-- Admin Info -->
       <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem">
         <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:1.25rem">ADMIN INFO</h4>
@@ -2163,6 +2191,18 @@ function loadAdminSettings() {
       </div>
     </div>
   `;
+
+  // Show current Paystack key status
+  const currentKey = window.PAYSTACK_PUBLIC_KEY || '';
+  const pkEl = document.getElementById('pk-current');
+  if (pkEl) {
+    if (currentKey && !currentKey.includes('YOUR')) {
+      pkEl.textContent = currentKey.slice(0,12) + '...' + currentKey.slice(-4);
+      pkEl.style.color = '#4CAF50';
+    } else {
+      pkEl.textContent = 'Not configured';
+    }
+  }
 
   // Show current admin email from token
   try {
@@ -2224,8 +2264,424 @@ async function changePassword() {
   }
 }
 
+// ── SALES REPORT ─────────────────────────────────────────────
+async function loadSalesReport() {
+  const con = document.getElementById('admin-content');
+  con.innerHTML = '<div style="color:var(--gray);padding:2rem;text-align:center">Loading sales data…</div>';
+  try {
+    const [ordersRes, statsRes] = await Promise.all([
+      apiFetch('/orders'),
+      apiFetch('/orders/stats/summary')
+    ]);
+    const orders = (ordersRes.data || []).filter(o => o.status !== 'cancelled');
+    const stats = statsRes.data || {};
+
+    // Calculate metrics
+    const paid = orders.filter(o => o.paymentStatus === 'paid');
+    const cash = orders.filter(o => o.paymentStatus !== 'paid');
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 7);
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+
+    const todayOrders = orders.filter(o => new Date(o.createdAt) >= todayStart);
+    const weekOrders = orders.filter(o => new Date(o.createdAt) >= weekStart);
+    const monthOrders = orders.filter(o => new Date(o.createdAt) >= monthStart);
+
+    const todayRev = todayOrders.reduce((s,o) => s+o.total, 0);
+    const weekRev = weekOrders.reduce((s,o) => s+o.total, 0);
+    const monthRev = monthOrders.reduce((s,o) => s+o.total, 0);
+    const totalRev = orders.reduce((s,o) => s+o.total, 0);
+    const avgOrder = orders.length ? Math.round(totalRev / orders.length) : 0;
+
+    // Top items
+    const itemCounts = {};
+    orders.forEach(o => (o.items||[]).forEach(i => {
+      itemCounts[i.name] = (itemCounts[i.name] || 0) + i.quantity;
+    }));
+    const topItems = Object.entries(itemCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+    // Orders by hour today
+    const hourly = Array(24).fill(0);
+    todayOrders.forEach(o => {
+      const h = new Date(o.createdAt).getHours();
+      hourly[h]++;
+    });
+    const peakHour = hourly.indexOf(Math.max(...hourly));
+    const peakLabel = peakHour === 0 ? 'No orders yet' : `${peakHour}:00 - ${peakHour+1}:00`;
+
+    con.innerHTML = `
+      <div style="margin-bottom:2rem">
+        <h3 style="font-family:var(--font-d);font-size:28px;letter-spacing:2px;margin-bottom:.5rem">SALES REPORT</h3>
+        <p style="font-size:12px;color:var(--gray)">All figures exclude cancelled orders.</p>
+      </div>
+
+      <!-- Revenue cards -->
+      <div class="stats-grid" style="margin-bottom:2rem">
+        <div class="stat-card">
+          <div class="stat-card-icon">📅</div>
+          <div class="stat-card-n">GH₵${todayRev.toLocaleString()}</div>
+          <div class="stat-card-l">Today's Revenue</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px">${todayOrders.length} orders</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">📆</div>
+          <div class="stat-card-n">GH₵${weekRev.toLocaleString()}</div>
+          <div class="stat-card-l">This Week</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px">${weekOrders.length} orders</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">🗓</div>
+          <div class="stat-card-n">GH₵${monthRev.toLocaleString()}</div>
+          <div class="stat-card-l">This Month</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px">${monthOrders.length} orders</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">💰</div>
+          <div class="stat-card-n">GH₵${totalRev.toLocaleString()}</div>
+          <div class="stat-card-l">All Time Revenue</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px">${orders.length} total orders</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+        <!-- Payment breakdown -->
+        <div style="background:var(--black);border:1px solid var(--border);border-radius:12px;padding:1.5rem">
+          <div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gray);margin-bottom:1.25rem">Payment Breakdown</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:12px;height:12px;background:#4CAF50;border-radius:50%"></div>
+              <span style="font-size:14px">Card / MoMo</span>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:var(--font-d);font-size:20px;color:var(--yellow)">GH₵${paid.reduce((s,o)=>s+o.total,0).toLocaleString()}</div>
+              <div style="font-size:11px;color:var(--gray)">${paid.length} orders</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:12px;height:12px;background:orange;border-radius:50%"></div>
+              <span style="font-size:14px">Cash</span>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:var(--font-d);font-size:20px;color:var(--yellow)">GH₵${cash.reduce((s,o)=>s+o.total,0).toLocaleString()}</div>
+              <div style="font-size:11px;color:var(--gray)">${cash.length} orders</div>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:1rem;display:flex;justify-content:space-between">
+            <span style="font-size:13px;color:var(--gray)">Avg. Order Value</span>
+            <span style="font-family:var(--font-d);font-size:20px;color:var(--yellow)">GH₵${avgOrder}</span>
+          </div>
+        </div>
+
+        <!-- Order type breakdown -->
+        <div style="background:var(--black);border:1px solid var(--border);border-radius:12px;padding:1.5rem">
+          <div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gray);margin-bottom:1.25rem">Order Types</div>
+          ${['pickup','delivery'].map(type => {
+            const typeOrders = orders.filter(o => o.orderType === type);
+            const typeRev = typeOrders.reduce((s,o)=>s+o.total,0);
+            const pct = orders.length ? Math.round(typeOrders.length/orders.length*100) : 0;
+            return `
+              <div style="margin-bottom:1rem">
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+                  <span style="text-transform:capitalize;font-weight:600">${type}</span>
+                  <span style="color:var(--gray)">${typeOrders.length} orders · GH₵${typeRev.toLocaleString()}</span>
+                </div>
+                <div style="background:var(--border);border-radius:100px;height:6px;overflow:hidden">
+                  <div style="height:100%;width:${pct}%;background:var(--red);border-radius:100px"></div>
+                </div>
+                <div style="font-size:11px;color:var(--gray);margin-top:3px">${pct}% of orders</div>
+              </div>
+            `;
+          }).join('')}
+          <div style="border-top:1px solid var(--border);padding-top:1rem;display:flex;justify-content:space-between">
+            <span style="font-size:13px;color:var(--gray)">Peak Hour Today</span>
+            <span style="font-size:13px;font-weight:700;color:var(--white)">${peakLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top selling items -->
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:12px;padding:1.5rem">
+        <div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gray);margin-bottom:1.25rem">Top Selling Items</div>
+        ${topItems.length === 0 ? '<div style="color:var(--gray);font-size:14px;text-align:center;padding:1rem">No sales data yet</div>' :
+          topItems.map(([name, qty], i) => `
+            <div style="display:flex;align-items:center;gap:1rem;padding:10px 0;border-bottom:1px solid ${i < topItems.length-1 ? 'var(--border)' : 'transparent'}">
+              <div style="font-family:var(--font-d);font-size:24px;color:var(--red);min-width:30px">${i+1}</div>
+              <div style="flex:1;font-weight:600;font-size:14px">${name}</div>
+              <div style="text-align:right">
+                <div style="font-family:var(--font-d);font-size:20px;color:var(--yellow)">${qty}</div>
+                <div style="font-size:11px;color:var(--gray)">sold</div>
+              </div>
+            </div>
+          `).join('')}
+      </div>
+    `;
+  } catch(err) {
+    document.getElementById('admin-content').innerHTML = '<div style="color:var(--gray);padding:2rem">Could not load sales data.</div>';
+  }
+}
+
+// ── MENU MANAGER ──────────────────────────────────────────────
+let editingItemId = null;
+
+async function loadMenuManager() {
+  const con = document.getElementById('admin-content');
+  con.innerHTML = '<div style="color:var(--gray);padding:2rem;text-align:center">Loading menu…</div>';
+  const res = await apiFetch('/menu');
+  const items = res.data || [];
+  con.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+      <h3 style="font-family:var(--font-d);font-size:28px;letter-spacing:2px">MENU MANAGER</h3>
+      <button class="btn-red" onclick="openMenuForm(null)" style="padding:10px 24px;font-size:12px">+ Add New Item</button>
+    </div>
+
+    <!-- Menu form (hidden by default) -->
+    <div id="menu-form-wrap" style="display:none;background:var(--black);border:1px solid var(--red);border-radius:12px;padding:2rem;margin-bottom:2rem">
+      <h4 id="menu-form-title" style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:1.5rem">ADD NEW ITEM</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+        <div>
+          <label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:6px">Item Name</label>
+          <input class="fi" type="text" id="mf-name" placeholder="e.g. THE YARD SMASH" style="margin:0">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:6px">Price (GH₵)</label>
+          <input class="fi" type="number" id="mf-price" placeholder="e.g. 45" style="margin:0">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+        <div>
+          <label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:6px">Category</label>
+          <select class="fi" id="mf-category" style="margin:0">
+            <option value="burger">Burger</option>
+            <option value="combo">Combo</option>
+            <option value="sides">Sides</option>
+            <option value="drinks">Drinks</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:6px">Badge (optional)</label>
+          <input class="fi" type="text" id="mf-badge" placeholder="e.g. New, Best Seller" style="margin:0">
+        </div>
+      </div>
+      <div style="margin-bottom:1rem">
+        <label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:6px">Description</label>
+        <textarea class="fi" id="mf-description" placeholder="Describe the item…" style="margin:0;min-height:80px;resize:vertical"></textarea>
+      </div>
+      <div style="margin-bottom:1.5rem">
+        <label style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:6px">Image URL</label>
+        <input class="fi" type="text" id="mf-image" placeholder="https://images.unsplash.com/..." style="margin:0">
+        <div style="font-size:11px;color:var(--gray);margin-top:6px">Tip: use a free image from unsplash.com or upload your own and paste the link</div>
+      </div>
+      <div style="display:flex;gap:1rem">
+        <button class="btn-red" style="flex:1;justify-content:center;padding:12px" onclick="saveMenuItem()">
+          <span id="mf-save-label">Save Item</span>
+        </button>
+        <button onclick="closeMenuForm()" style="background:transparent;border:1px solid var(--border);color:var(--gray);padding:12px 24px;border-radius:8px;cursor:pointer;font-family:var(--font-b);font-size:13px;font-weight:700">
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- Items table -->
+    <div style="background:var(--black);border:1px solid var(--border);border-radius:12px;overflow:auto">
+      <table class="orders-table">
+        <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Badge</th><th>Available</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${items.map(i => `
+            <tr style="opacity:${i.available ? '1' : '0.5'}">
+              <td><img src="${i.image}" style="width:52px;height:40px;object-fit:cover;border-radius:6px;background:#222" onerror="this.style.display='none'"></td>
+              <td>
+                <strong>${i.name}</strong>
+                ${!i.available ? '<span style="font-size:10px;background:rgba(230,48,18,.2);color:var(--red-light);border:1px solid rgba(230,48,18,.3);padding:2px 7px;border-radius:4px;margin-left:6px;font-weight:700">OUT OF STOCK</span>' : ''}
+              </td>
+              <td style="text-transform:capitalize;color:var(--gray)">${i.category}</td>
+              <td style="font-family:var(--font-d);font-size:18px;color:var(--yellow)">GH₵${i.price}</td>
+              <td style="font-size:12px">${i.badge || '–'}</td>
+              <td>
+                <button onclick="toggleAvailability('${i._id}', ${i.available}, this)"
+                  style="background:${i.available ? 'rgba(46,125,50,.15)' : 'rgba(230,48,18,.15)'};border:1px solid ${i.available ? 'rgba(46,125,50,.4)' : 'rgba(230,48,18,.4)'};color:${i.available ? '#4CAF50' : 'var(--red-light)'};padding:5px 12px;border-radius:100px;cursor:pointer;font-size:11px;font-weight:800;font-family:var(--font-b)">
+                  ${i.available ? '✓ IN STOCK' : '✗ OUT'}
+                </button>
+              </td>
+              <td style="display:flex;gap:.5rem;align-items:center">
+                <button onclick="openMenuForm('${i._id}')"
+                  style="background:rgba(255,214,0,.1);border:1px solid rgba(255,214,0,.3);color:var(--yellow);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:var(--font-b)">
+                  ✏ Edit
+                </button>
+                <button onclick="deleteMenuItem('${i._id}', '${i.name.replace(/'/g,'')}')"
+                  style="background:rgba(230,48,18,.1);border:1px solid rgba(230,48,18,.3);color:var(--red-light);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:var(--font-b)">
+                  🗑
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  // Store items for editing
+  window._menuItems = items;
+}
+
+function openMenuForm(id) {
+  editingItemId = id;
+  const wrap = document.getElementById('menu-form-wrap');
+  wrap.style.display = 'block';
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  if (id) {
+    // Edit existing
+    const item = window._menuItems.find(i => i._id === id);
+    if (!item) return;
+    document.getElementById('menu-form-title').textContent = 'EDIT ITEM';
+    document.getElementById('mf-save-label').textContent = 'Update Item';
+    document.getElementById('mf-name').value = item.name;
+    document.getElementById('mf-price').value = item.price;
+    document.getElementById('mf-category').value = item.category;
+    document.getElementById('mf-badge').value = item.badge || '';
+    document.getElementById('mf-description').value = item.description;
+    document.getElementById('mf-image').value = item.image || '';
+  } else {
+    // New item
+    document.getElementById('menu-form-title').textContent = 'ADD NEW ITEM';
+    document.getElementById('mf-save-label').textContent = 'Save Item';
+    document.getElementById('mf-name').value = '';
+    document.getElementById('mf-price').value = '';
+    document.getElementById('mf-category').value = 'burger';
+    document.getElementById('mf-badge').value = '';
+    document.getElementById('mf-description').value = '';
+    document.getElementById('mf-image').value = '';
+  }
+}
+
+function closeMenuForm() {
+  document.getElementById('menu-form-wrap').style.display = 'none';
+  editingItemId = null;
+}
+
+async function saveMenuItem() {
+  const name = document.getElementById('mf-name').value.trim();
+  const price = parseFloat(document.getElementById('mf-price').value);
+  const category = document.getElementById('mf-category').value;
+  const badge = document.getElementById('mf-badge').value.trim() || null;
+  const description = document.getElementById('mf-description').value.trim();
+  const image = document.getElementById('mf-image').value.trim();
+
+  if (!name || !price || !description) {
+    toast('⚠️ Name, price and description are required');
+    return;
+  }
+
+  const payload = { name: name.toUpperCase(), price, category, badge, description, image, available: true };
+  const label = document.getElementById('mf-save-label');
+  label.textContent = 'Saving…';
+
+  try {
+    let res;
+    if (editingItemId) {
+      res = await apiFetch('/menu/' + editingItemId, { method: 'PUT', body: JSON.stringify(payload) });
+    } else {
+      res = await apiFetch('/menu', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    if (res.success) {
+      toast(editingItemId ? '✅ Item updated!' : '✅ New item added!');
+      closeMenuForm();
+      loadMenuManager();
+      await loadMenu(); // refresh customer menu
+    } else {
+      toast('❌ ' + res.message);
+      label.textContent = editingItemId ? 'Update Item' : 'Save Item';
+    }
+  } catch {
+    toast('❌ Could not save item');
+    label.textContent = editingItemId ? 'Update Item' : 'Save Item';
+  }
+}
+
+async function deleteMenuItem(id, name) {
+  if (!confirm('Delete "' + name + '"? This cannot be undone.')) return;
+  const res = await apiFetch('/menu/' + id, { method: 'DELETE' });
+  if (res.success) {
+    toast('🗑️ ' + name + ' deleted');
+    loadMenuManager();
+    await loadMenu();
+  } else {
+    toast('❌ Could not delete item');
+  }
+}
+
+// ── WHATSAPP ORDER CONFIRMATION ───────────────────────────────
+function sendWhatsAppConfirmation(order) {
+  const phone = order.customer.phone.replace(/\D/g, '');
+  const waPhone = phone.startsWith('0') ? '233' + phone.slice(1) : phone.startsWith('233') ? phone : '233' + phone;
+  const isPaid = order.paymentStatus === 'paid';
+  const itemsList = order.items.map(i => `  • ${i.name} ×${i.quantity} — GH₵${(i.price*i.quantity).toLocaleString()}`).join('
+');
+
+  const msg =
+    `🍔 *BURGER YARD KNUST*
+` +
+    `━━━━━━━━━━━━━━━━━━
+` +
+    `✅ *Order Confirmed!*
+
+` +
+    `*Order #:* ${order.orderNumber}
+` +
+    `*Name:* ${order.customer.name}
+` +
+    `*Type:* ${order.orderType.charAt(0).toUpperCase() + order.orderType.slice(1)}
+` +
+    (order.deliveryLocation ? `*Location:* ${order.deliveryLocation}
+` : '') +
+    `
+*Items:*
+${itemsList}
+
+` +
+    `*Total: GH₵${order.total.toLocaleString()}*
+` +
+    `*Payment:* ${isPaid ? '✅ Paid' : '⏳ Cash on ' + order.orderType}
+
+` +
+    `⏱ Est. ready in *15 minutes*
+
+` +
+    `Track your order at:
+` +
+    `https://burger-yard-rcnq.onrender.com/#track
+` +
+    `Order number: *${order.orderNumber}*
+
+` +
+    `_Thank you for ordering from Burger Yard! 🔥_`;
+
+  window.open('https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
 // ── PAYSTACK PUBLIC KEY (safe to expose — never the secret key) ──
 window.PAYSTACK_PUBLIC_KEY = 'pk_test_YOUR_PUBLIC_KEY'; // ← Replace with your real key from paystack.com/dashboard
+
+function savePaystackKey() {
+  const key = document.getElementById('pk-input').value.trim();
+  if (!key || (!key.startsWith('pk_live_') && !key.startsWith('pk_test_'))) {
+    toast('⚠️ Enter a valid Paystack public key (starts with pk_live_ or pk_test_)');
+    return;
+  }
+  window.PAYSTACK_PUBLIC_KEY = key;
+  localStorage.setItem('by_paystack_pk', key);
+  toast('✅ Paystack key saved! Payments are now active.');
+  const pkEl = document.getElementById('pk-current');
+  if (pkEl) { pkEl.textContent = key.slice(0,12) + '...' + key.slice(-4); pkEl.style.color = '#4CAF50'; }
+  const msg = document.getElementById('pk-msg');
+  if (msg) msg.innerHTML = 'Status: <span style="color:#4CAF50;font-weight:700">✅ Active</span>';
+}
+
+// Load saved Paystack key from localStorage on startup
+(function() {
+  const saved = localStorage.getItem('by_paystack_pk');
+  if (saved) window.PAYSTACK_PUBLIC_KEY = saved;
+})();
 </script>
 </body>
 </html>
