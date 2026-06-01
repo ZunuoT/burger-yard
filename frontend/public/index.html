@@ -1196,38 +1196,28 @@ function printReceipt(orderNum, name, phone, orderType, total, subtotal, deliver
     </div>
   `;
 
-  // Create hidden print area
-  // Open receipt in a new popup window for clean printing
-  const printWin = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
-  printWin.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Receipt - ${orderNum || o.orderNumber}</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #fff; }
-        @media print {
-          @page { size: 80mm auto; margin: 3mm 3mm 8mm 3mm; }
-          body { width: 80mm; }
-        }
-        @media screen {
-          body { display: flex; justify-content: center; padding: 20px; background: #f5f5f5; }
-        }
-      </style>
-    </head>
-    <body>
-      ${receiptHTML}
-      <script>
-        window.onload = function() {
-          window.print();
-          window.onafterprint = function() { window.close(); };
-        };
-      <\/script>
-    </body>
-    </html>
-  `);
-  printWin.document.close();
+  // Open receipt as blob URL to avoid script tag parsing issues
+  openPrintWindow(receiptHTML);
+}
+
+function openPrintWindow(receiptHTML) {
+  const printScript = 'window.onload=function(){window.print();window.onafterprint=function(){window.close();};};';
+  const html = [
+    '<!DOCTYPE html><html><head>',
+    '<title>Receipt</title>',
+    '<style>*{margin:0;padding:0;box-sizing:border-box}',
+    'body{background:#fff}',
+    '@media print{@page{size:80mm auto;margin:3mm 3mm 8mm 3mm}body{width:80mm}}',
+    '@media screen{body{display:flex;justify-content:center;padding:20px;background:#f5f5f5}}',
+    '</style></head><body>',
+    receiptHTML,
+    '<scr' + 'ipt>' + printScript + '</scr' + 'ipt>',
+    '</body></html>'
+  ].join('');
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank', 'width=420,height=650,scrollbars=yes');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 // ── TRACK ORDER ───────────────────────────────────────────────
@@ -1903,9 +1893,7 @@ function printAdminReceipt(o) {
   `;
 
   // Open in popup for clean printing
-  const printWin = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
-  printWin.document.write('<!DOCTYPE html><html><head><title>Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#fff}@media print{@page{size:80mm auto;margin:3mm 3mm 8mm 3mm}body{width:80mm}}@media screen{body{display:flex;justify-content:center;padding:20px;background:#f5f5f5}}</style></head><body>' + receiptHTML + '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/script></body></html>');
-  printWin.document.close();
+  openPrintWindow(receiptHTML);
 }
 
 async function advanceOrder(id, status, btn) {
@@ -2612,50 +2600,29 @@ async function deleteMenuItem(id, name) {
 
 // ── WHATSAPP ORDER CONFIRMATION ───────────────────────────────
 function sendWhatsAppConfirmation(order) {
-  const phone = order.customer.phone.replace(/\D/g, '');
-  const waPhone = phone.startsWith('0') ? '233' + phone.slice(1) : phone.startsWith('233') ? phone : '233' + phone;
-  const isPaid = order.paymentStatus === 'paid';
-  const itemsList = order.items.map(i => `  • ${i.name} ×${i.quantity} — GH₵${(i.price*i.quantity).toLocaleString()}`).join('
-');
-
-  const msg =
-    `🍔 *BURGER YARD KNUST*
-` +
-    `━━━━━━━━━━━━━━━━━━
-` +
-    `✅ *Order Confirmed!*
-
-` +
-    `*Order #:* ${order.orderNumber}
-` +
-    `*Name:* ${order.customer.name}
-` +
-    `*Type:* ${order.orderType.charAt(0).toUpperCase() + order.orderType.slice(1)}
-` +
-    (order.deliveryLocation ? `*Location:* ${order.deliveryLocation}
-` : '') +
-    `
-*Items:*
-${itemsList}
-
-` +
-    `*Total: GH₵${order.total.toLocaleString()}*
-` +
-    `*Payment:* ${isPaid ? '✅ Paid' : '⏳ Cash on ' + order.orderType}
-
-` +
-    `⏱ Est. ready in *15 minutes*
-
-` +
-    `Track your order at:
-` +
-    `https://burger-yard-rcnq.onrender.com/#track
-` +
-    `Order number: *${order.orderNumber}*
-
-` +
-    `_Thank you for ordering from Burger Yard! 🔥_`;
-
+  var rawPhone = (order.customer.phone || '').replace(/[^0-9]/g, '');
+  var waPhone = rawPhone.startsWith('233') ? rawPhone : rawPhone.startsWith('0') ? '233' + rawPhone.slice(1) : '233' + rawPhone;
+  var isPaid = order.paymentStatus === 'paid';
+  var nl = '\n';
+  var items = (order.items || []).map(function(i) {
+    return '  - ' + i.name + ' x' + i.quantity + ' = GH' + String.fromCharCode(8373) + (i.price * i.quantity).toLocaleString();
+  }).join(nl);
+  var loc = order.deliveryLocation ? nl + '*Location:* ' + order.deliveryLocation : '';
+  var msg = '🍔 *BURGER YARD KNUST*' + nl +
+    '━━━━━━━━━━━━━━━━━━' + nl +
+    '✅ *Order Confirmed!*' + nl + nl +
+    '*Order #:* ' + order.orderNumber + nl +
+    '*Name:* ' + order.customer.name + nl +
+    '*Phone:* ' + order.customer.phone + nl +
+    '*Type:* ' + (order.orderType || '').charAt(0).toUpperCase() + (order.orderType || '').slice(1) +
+    loc + nl + nl +
+    '*Items:*' + nl + items + nl + nl +
+    '*Total: GH' + String.fromCharCode(8373) + order.total.toLocaleString() + '*' + nl +
+    '*Payment:* ' + (isPaid ? '✅ Paid' : '⏳ Cash on ' + order.orderType) + nl + nl +
+    '⏱ Est. ready in *15 minutes*' + nl + nl +
+    'Track order: https://burger-yard-rcnq.onrender.com' + nl +
+    'Order #: *' + order.orderNumber + '*' + nl + nl +
+    '_Thank you for ordering from Burger Yard! 🔥_';
   window.open('https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
