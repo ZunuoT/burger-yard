@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Burger Yard — KNUST's Boldest Bites</title>
 <script src="https://js.paystack.co/v2/inline.js"></script>
@@ -324,10 +326,22 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
 
 /* RECEIPT */
 @media print {
+  /* Hide everything except the receipt */
   body * { visibility: hidden !important; }
   #receipt-printable, #receipt-printable * { visibility: visible !important; }
-  #receipt-printable { position: fixed !important; top: 0; left: 0; width: 100%; padding: 0 !important; margin: 0 !important; }
-  @page { margin: 10mm; size: 80mm auto; }
+  #receipt-printable {
+    position: fixed !important;
+    top: 0; left: 0;
+    width: 80mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 12px !important;
+  }
+  /* Thermal printer page settings — 80mm wide, auto height */
+  @page {
+    size: 80mm auto;
+    margin: 3mm 3mm 8mm 3mm;
+  }
 }
 .receipt-btn { background: var(--off-black); color: var(--white); border: 2px solid var(--border); padding: 12px 28px; font-family: var(--font-b); font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 8px; }
 .receipt-btn:hover { border-color: var(--yellow); color: var(--yellow); }
@@ -1795,67 +1809,79 @@ function printAdminReceipt(o) {
   const isPaid = o.paymentStatus === 'paid';
 
   const receiptHTML = `
-    <div id="receipt-printable" style="font-family:'Courier New',monospace;max-width:300px;margin:0 auto;padding:20px;color:#000;background:#fff">
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:24px;font-weight:900;letter-spacing:4px;margin-bottom:2px">BURGER YARD</div>
-        <div style="font-size:11px">Near Lienda Ville Hostel, KNUST</div>
-        <div style="font-size:11px">Kumasi, Ghana</div>
-        <div style="font-size:11px;margin-top:4px">Tel: +233 XX XXX XXXX</div>
+    <div id="receipt-printable" style="font-family:'Courier New',monospace;width:72mm;margin:0;padding:4mm;color:#000;background:#fff;font-size:11px;line-height:1.4">
+
+      <!-- HEADER -->
+      <div style="text-align:center;margin-bottom:8px">
+        <div style="font-size:18px;font-weight:900;letter-spacing:3px">BURGER YARD</div>
+        <div style="font-size:10px;margin-top:2px">Near Lienda Ville Hostel, KNUST</div>
+        <div style="font-size:10px">Kumasi, Ghana</div>
+        <div style="font-size:10px;margin-top:2px">Tel: +233 XX XXX XXXX</div>
       </div>
 
-      <div style="border-top:2px dashed #000;margin:10px 0"></div>
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
 
-      <div style="font-size:12px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between"><span>Order #:</span><strong>${o.orderNumber}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Date:</span><span>${dateStr}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>Time:</span><span>${timeStr}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>Type:</span><span style="text-transform:capitalize">${o.orderType}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>Status:</span><span style="text-transform:capitalize">${o.status}</span></div>
-        ${o.deliveryLocation ? `<div style="display:flex;justify-content:space-between"><span>Location:</span><span>${o.deliveryLocation}</span></div>` : ''}
-      </div>
+      <!-- ORDER INFO -->
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr><td>Order #</td><td style="text-align:right"><strong>${o.orderNumber}</strong></td></tr>
+        <tr><td>Date</td><td style="text-align:right">${dateStr}</td></tr>
+        <tr><td>Time</td><td style="text-align:right">${timeStr}</td></tr>
+        <tr><td>Type</td><td style="text-align:right;text-transform:capitalize">${o.orderType}</td></tr>
+        <tr><td>Status</td><td style="text-align:right;text-transform:capitalize">${o.status}</td></tr>
+        ${o.deliveryLocation ? `<tr><td>Location</td><td style="text-align:right">${o.deliveryLocation}</td></tr>` : ''}
+      </table>
 
-      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
 
-      <div style="font-size:12px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between"><span>Customer:</span><span>${o.customer.name}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>Phone:</span><span>${o.customer.phone}</span></div>
-      </div>
+      <!-- CUSTOMER -->
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr><td>Customer</td><td style="text-align:right">${o.customer.name}</td></tr>
+        <tr><td>Phone</td><td style="text-align:right">${o.customer.phone}</td></tr>
+      </table>
 
-      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
 
-      <div style="font-size:12px;margin-bottom:8px">
-        <div style="font-weight:700;margin-bottom:6px">ITEMS</div>
+      <!-- ITEMS -->
+      <div style="font-weight:700;font-size:11px;margin-bottom:4px">ITEMS</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
         ${(o.items || []).map(i => `
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span>${i.name} x${i.quantity}</span>
-            <span>GH&#8373;${(i.price * i.quantity).toLocaleString()}</span>
-          </div>
+          <tr>
+            <td style="padding-bottom:3px">${i.name}<br><span style="font-size:10px;color:#555">x${i.quantity} @ GH&#8373;${i.price}</span></td>
+            <td style="text-align:right;vertical-align:top;padding-bottom:3px"><strong>GH&#8373;${(i.price * i.quantity).toLocaleString()}</strong></td>
+          </tr>
         `).join('')}
-      </div>
+      </table>
 
-      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
 
-      <div style="font-size:12px;margin-bottom:8px">
+      <!-- TOTALS -->
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
         ${o.subtotal !== o.total ? `
-          <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>GH&#8373;${o.subtotal}</span></div>
-          <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>GH&#8373;${o.deliveryFee || 0}</span></div>
+          <tr><td>Subtotal</td><td style="text-align:right">GH&#8373;${o.subtotal}</td></tr>
+          <tr><td>Delivery Fee</td><td style="text-align:right">GH&#8373;${o.deliveryFee || 0}</td></tr>
         ` : ''}
-        <div style="display:flex;justify-content:space-between;font-weight:900;font-size:16px;margin-top:6px">
-          <span>TOTAL:</span><span>GH&#8373;${o.total.toLocaleString()}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px">
-          <span>Payment:</span>
-          <strong>${isPaid ? 'PAID (Card/MoMo)' : 'CASH'}</strong>
-        </div>
+        <tr style="font-size:14px;font-weight:900">
+          <td style="padding-top:4px">TOTAL</td>
+          <td style="text-align:right;padding-top:4px">GH&#8373;${o.total.toLocaleString()}</td>
+        </tr>
+        <tr>
+          <td style="padding-top:4px">Payment</td>
+          <td style="text-align:right;padding-top:4px"><strong>${isPaid ? 'PAID' : 'CASH'}</strong></td>
+        </tr>
+      </table>
+
+      <div style="border-top:1px dashed #000;margin:6px 0"></div>
+
+      <!-- FOOTER -->
+      <div style="text-align:center;font-size:10px;line-height:1.8">
+        <div>Thank you for your order!</div>
+        <div>Come back soon 🍔</div>
+        <div style="margin-top:4px;font-size:9px">burger-yard-rcnq.onrender.com</div>
+        <div style="margin-top:6px;font-size:10px;letter-spacing:1px">*** BURGER YARD KNUST ***</div>
       </div>
 
-      <div style="border-top:2px dashed #000;margin:10px 0"></div>
-
-      <div style="text-align:center;font-size:11px">
-        <div style="margin-bottom:4px">Thank you for your order!</div>
-        <div>Visit us again soon 🍔</div>
-        <div style="margin-top:8px;font-size:10px">burger-yard-rcnq.onrender.com</div>
-      </div>
+      <!-- Blank space at bottom for paper tear -->
+      <div style="height:15mm"></div>
     </div>
   `;
 
