@@ -322,6 +322,16 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
 .paystack-secure{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray);margin-top:.4rem}
 .paystack-secure svg{width:14px;height:14px;fill:var(--gray)}
 
+/* RECEIPT */
+@media print {
+  body * { visibility: hidden !important; }
+  #receipt-printable, #receipt-printable * { visibility: visible !important; }
+  #receipt-printable { position: fixed !important; top: 0; left: 0; width: 100%; padding: 0 !important; margin: 0 !important; }
+  @page { margin: 10mm; size: 80mm auto; }
+}
+.receipt-btn { background: var(--off-black); color: var(--white); border: 2px solid var(--border); padding: 12px 28px; font-family: var(--font-b); font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 8px; }
+.receipt-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+
 /* MOBILE MENU */
 .mobile-menu{display:none;position:fixed;top:68px;left:0;right:0;bottom:0;background:rgba(13,13,13,.98);z-index:199;flex-direction:column;align-items:center;justify-content:center;gap:1.75rem}
 .mobile-menu.open{display:flex}
@@ -1069,6 +1079,10 @@ async function saveCashOrder(fields) {
 // ── ORDER SUCCESS SCREEN ──────────────────────────────────────
 function showOrderSuccess(order, paystackRef) {
   const isPaid = order.paymentStatus === 'paid';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GH', { day:'numeric', month:'long', year:'numeric' });
+  const timeStr = now.toLocaleTimeString('en-GH', { hour:'2-digit', minute:'2-digit' });
+
   document.getElementById('order-online').innerHTML = `
     <div class="con" style="text-align:center;padding:4rem 2rem">
       <div style="font-size:80px;margin-bottom:1.5rem">🎉</div>
@@ -1077,17 +1091,31 @@ function showOrderSuccess(order, paystackRef) {
       <div style="display:inline-flex;align-items:center;gap:8px;background:${isPaid ? 'rgba(46,125,50,.15)' : 'rgba(255,165,0,.15)'};border:1px solid ${isPaid ? 'rgba(46,125,50,.3)' : 'rgba(255,165,0,.3)'};color:${isPaid ? '#4CAF50' : 'orange'};font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:8px 20px;border-radius:100px;margin-bottom:2.5rem">
         ${isPaid ? '✓ PAYMENT CONFIRMED' : '⏳ PAY ON ' + order.orderType.toUpperCase()}
       </div>
+
+      <!-- Order summary card -->
       <div style="background:var(--off-black);border:1px solid var(--border);border-radius:16px;padding:2rem;max-width:480px;margin:0 auto 2rem;text-align:left">
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px"><span style="color:var(--gray)">Customer</span><strong>${order.customer.name}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px"><span style="color:var(--gray)">Phone</span><strong>${order.customer.phone}</strong></div>
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px"><span style="color:var(--gray)">Order Type</span><strong style="text-transform:capitalize">${order.orderType}</strong></div>
+        ${order.deliveryLocation ? `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px"><span style="color:var(--gray)">Location</span><strong>${order.deliveryLocation}</strong></div>` : ''}
         <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px"><span style="color:var(--gray)">Est. Ready In</span><strong>15 minutes</strong></div>
         ${paystackRef ? `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--gray)">Paystack Ref</span><code style="color:var(--yellow);font-size:12px">${paystackRef}</code></div>` : ''}
+        <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);margin-bottom:8px">Items</div>
+          ${order.items.map(i => `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>${i.name} ×${i.quantity}</span><span>GH₵${(i.price*i.quantity).toLocaleString()}</span></div>`).join('')}
+        </div>
+        ${order.subtotal !== order.total ? `<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:var(--gray)"><span>Subtotal</span><span>GH₵${order.subtotal}</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:var(--gray)"><span>Delivery Fee</span><span>GH₵${order.deliveryFee}</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;padding:12px 0;font-size:18px;font-family:var(--font-d)"><span style="color:var(--gray)">TOTAL</span><strong style="color:var(--yellow)">GH₵ ${order.total.toLocaleString()}</strong></div>
       </div>
+
       <p style="font-size:14px;color:var(--gray);max-width:420px;margin:0 auto 2rem;line-height:1.7">
         Use your order number <strong style="color:white">${order.orderNumber}</strong> to track your order in the <a href="#track" style="color:var(--red)">Track Order</a> section.
       </p>
-      <button class="btn-red" onclick="location.reload()">Place Another Order →</button>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <button class="btn-red" onclick="location.reload()">Place Another Order →</button>
+      </div>
     </div>
   `;
   cart = [];
@@ -1095,6 +1123,92 @@ function showOrderSuccess(order, paystackRef) {
   document.getElementById('drawer-body').innerHTML = '<div class="cart-empty-msg">Your bag is empty.</div>';
   document.getElementById('drawer-foot').style.display = 'none';
   scrollToSection('order-online');
+}
+
+// ── PRINT RECEIPT ─────────────────────────────────────────────
+function printReceipt(orderNum, name, phone, orderType, total, subtotal, deliveryFee, payStatus, dateStr, timeStr, items, location, paystackRef) {
+  const receiptHTML = `
+    <div id="receipt-printable" style="font-family:'Courier New',monospace;max-width:300px;margin:0 auto;padding:20px;color:#000;background:#fff">
+      <!-- Header -->
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:24px;font-weight:900;letter-spacing:4px;margin-bottom:2px">BURGER YARD</div>
+        <div style="font-size:11px">Near Lienda Ville Hostel, KNUST</div>
+        <div style="font-size:11px">Kumasi, Ghana</div>
+        <div style="font-size:11px;margin-top:4px">Tel: +233 XX XXX XXXX</div>
+      </div>
+
+      <div style="border-top:2px dashed #000;margin:10px 0"></div>
+
+      <!-- Order info -->
+      <div style="font-size:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between"><span>Order #:</span><strong>${orderNum}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Date:</span><span>${dateStr}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Time:</span><span>${timeStr}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Type:</span><span style="text-transform:capitalize">${orderType}</span></div>
+        ${location ? `<div style="display:flex;justify-content:space-between"><span>Location:</span><span>${location}</span></div>` : ''}
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+
+      <!-- Customer -->
+      <div style="font-size:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between"><span>Customer:</span><span>${name}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Phone:</span><span>${phone}</span></div>
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+
+      <!-- Items -->
+      <div style="font-size:12px;margin-bottom:8px">
+        <div style="font-weight:700;margin-bottom:6px">ITEMS</div>
+        ${items.map(i => `
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span>${i.name} x${i.quantity}</span>
+            <span>GH₵${(i.price * i.quantity).toLocaleString()}</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+
+      <!-- Totals -->
+      <div style="font-size:12px;margin-bottom:8px">
+        ${subtotal !== total ? `
+          <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>GH₵${subtotal}</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>GH₵${deliveryFee}</span></div>
+        ` : ''}
+        <div style="display:flex;justify-content:space-between;font-weight:900;font-size:16px;margin-top:6px">
+          <span>TOTAL:</span><span>GH₵${total.toLocaleString()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span>Payment:</span>
+          <strong>${payStatus}</strong>
+        </div>
+        ${paystackRef ? `<div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px"><span>Ref:</span><span>${paystackRef}</span></div>` : ''}
+      </div>
+
+      <div style="border-top:2px dashed #000;margin:10px 0"></div>
+
+      <!-- Footer -->
+      <div style="text-align:center;font-size:11px">
+        <div style="margin-bottom:4px">Thank you for your order!</div>
+        <div>Visit us again soon 🍔</div>
+        <div style="margin-top:8px;font-size:10px">burger-yard-rcnq.onrender.com</div>
+      </div>
+    </div>
+  `;
+
+  // Create hidden print area
+  let printArea = document.getElementById('print-area');
+  if (!printArea) {
+    printArea = document.createElement('div');
+    printArea.id = 'print-area';
+    document.body.appendChild(printArea);
+  }
+  printArea.innerHTML = receiptHTML;
+
+  // Trigger print
+  window.print();
 }
 
 // ── TRACK ORDER ───────────────────────────────────────────────
@@ -1650,6 +1764,15 @@ function buildOrderCard(o) {
         ` : `
           <div style="flex:1;padding:12px;text-align:center;font-size:13px;color:var(--gray);font-weight:600">${stage.label}</div>
         `}
+        <!-- Print Receipt Button -->
+        <button
+          onclick="printAdminReceipt(${JSON.stringify(o).replace(/"/g,'&quot;')})"
+          style="background:transparent;color:var(--gray);border:1px solid var(--border);padding:12px 16px;font-family:var(--font-b);font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px"
+          onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--gray)'"
+          title="Print Receipt">
+          🖨 Receipt
+        </button>
         ${!isDelivered && !isCancelled ? `
           <button
             onclick="advanceOrder('${o._id}', 'cancelled', this)"
@@ -1662,6 +1785,88 @@ function buildOrderCard(o) {
       </div>
     </div>
   `;
+}
+
+// ── ADMIN PRINT RECEIPT ───────────────────────────────────────
+function printAdminReceipt(o) {
+  const now = new Date(o.createdAt || Date.now());
+  const dateStr = now.toLocaleDateString('en-GH', { day:'numeric', month:'long', year:'numeric' });
+  const timeStr = now.toLocaleTimeString('en-GH', { hour:'2-digit', minute:'2-digit' });
+  const isPaid = o.paymentStatus === 'paid';
+
+  const receiptHTML = `
+    <div id="receipt-printable" style="font-family:'Courier New',monospace;max-width:300px;margin:0 auto;padding:20px;color:#000;background:#fff">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:24px;font-weight:900;letter-spacing:4px;margin-bottom:2px">BURGER YARD</div>
+        <div style="font-size:11px">Near Lienda Ville Hostel, KNUST</div>
+        <div style="font-size:11px">Kumasi, Ghana</div>
+        <div style="font-size:11px;margin-top:4px">Tel: +233 XX XXX XXXX</div>
+      </div>
+
+      <div style="border-top:2px dashed #000;margin:10px 0"></div>
+
+      <div style="font-size:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between"><span>Order #:</span><strong>${o.orderNumber}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Date:</span><span>${dateStr}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Time:</span><span>${timeStr}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Type:</span><span style="text-transform:capitalize">${o.orderType}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Status:</span><span style="text-transform:capitalize">${o.status}</span></div>
+        ${o.deliveryLocation ? `<div style="display:flex;justify-content:space-between"><span>Location:</span><span>${o.deliveryLocation}</span></div>` : ''}
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+
+      <div style="font-size:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between"><span>Customer:</span><span>${o.customer.name}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Phone:</span><span>${o.customer.phone}</span></div>
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+
+      <div style="font-size:12px;margin-bottom:8px">
+        <div style="font-weight:700;margin-bottom:6px">ITEMS</div>
+        ${(o.items || []).map(i => `
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span>${i.name} x${i.quantity}</span>
+            <span>GH&#8373;${(i.price * i.quantity).toLocaleString()}</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0"></div>
+
+      <div style="font-size:12px;margin-bottom:8px">
+        ${o.subtotal !== o.total ? `
+          <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>GH&#8373;${o.subtotal}</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Delivery:</span><span>GH&#8373;${o.deliveryFee || 0}</span></div>
+        ` : ''}
+        <div style="display:flex;justify-content:space-between;font-weight:900;font-size:16px;margin-top:6px">
+          <span>TOTAL:</span><span>GH&#8373;${o.total.toLocaleString()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span>Payment:</span>
+          <strong>${isPaid ? 'PAID (Card/MoMo)' : 'CASH'}</strong>
+        </div>
+      </div>
+
+      <div style="border-top:2px dashed #000;margin:10px 0"></div>
+
+      <div style="text-align:center;font-size:11px">
+        <div style="margin-bottom:4px">Thank you for your order!</div>
+        <div>Visit us again soon 🍔</div>
+        <div style="margin-top:8px;font-size:10px">burger-yard-rcnq.onrender.com</div>
+      </div>
+    </div>
+  `;
+
+  let printArea = document.getElementById('print-area');
+  if (!printArea) {
+    printArea = document.createElement('div');
+    printArea.id = 'print-area';
+    document.body.appendChild(printArea);
+  }
+  printArea.innerHTML = receiptHTML;
+  window.print();
 }
 
 async function advanceOrder(id, status, btn) {
