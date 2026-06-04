@@ -128,6 +128,36 @@ router.patch('/:id/status', protect, async (req, res) => {
   }
 });
 
+// DELETE clear orders (admin)
+router.delete('/clear', protect, async (req, res) => {
+  try {
+    const { type } = req.body;
+    if (!['all', 'delivered', 'cancelled'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid type. Use all, delivered or cancelled.' });
+    }
+
+    if (isDBConnected()) {
+      const filter = type === 'all' ? {} : { status: type };
+      const result = await Order.deleteMany(filter);
+      const label = type === 'all' ? 'All orders' : type.charAt(0).toUpperCase() + type.slice(1) + ' orders';
+      return res.json({ success: true, message: label + ' cleared (' + result.deletedCount + ' removed)' });
+    }
+
+    // In-memory fallback
+    const before = inMemoryOrders.length;
+    if (type === 'all') {
+      inMemoryOrders = [];
+    } else {
+      inMemoryOrders = inMemoryOrders.filter(o => o.status !== type);
+    }
+    const removed = before - inMemoryOrders.length;
+    const label = type === 'all' ? 'All orders' : type.charAt(0).toUpperCase() + type.slice(1) + ' orders';
+    res.json({ success: true, message: label + ' cleared (' + removed + ' removed)' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET order stats (admin)
 router.get('/stats/summary', protect, async (req, res) => {
   try {

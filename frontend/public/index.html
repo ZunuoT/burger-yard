@@ -2169,6 +2169,39 @@ function loadAdminSettings() {
         <p style="font-size:11px;color:var(--gray);margin-top:.75rem">⚠️ The secret key must be added in your Render environment variables — never put it here.</p>
       </div>
 
+      <!-- Clear Orders -->
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:1.5rem">
+        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:.4rem">CLEAR ORDERS</h4>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:1.5rem">Permanently delete orders from the database. This cannot be undone.</p>
+
+        <div style="display:flex;flex-direction:column;gap:.75rem">
+          <button onclick="clearOrders('delivered')"
+            style="background:rgba(46,125,50,.1);border:1px solid rgba(46,125,50,.3);color:#4CAF50;padding:13px 20px;border-radius:8px;cursor:pointer;font-family:var(--font-b);font-size:13px;font-weight:700;text-align:left;transition:all .2s"
+            onmouseover="this.style.background='rgba(46,125,50,.2)'"
+            onmouseout="this.style.background='rgba(46,125,50,.1)'">
+            🗑️ Clear Delivered Orders
+            <div style="font-size:11px;font-weight:400;color:var(--gray);margin-top:3px">Removes all orders with status "Delivered"</div>
+          </button>
+
+          <button onclick="clearOrders('cancelled')"
+            style="background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.3);color:orange;padding:13px 20px;border-radius:8px;cursor:pointer;font-family:var(--font-b);font-size:13px;font-weight:700;text-align:left;transition:all .2s"
+            onmouseover="this.style.background='rgba(255,165,0,.2)'"
+            onmouseout="this.style.background='rgba(255,165,0,.1)'">
+            🗑️ Clear Cancelled Orders
+            <div style="font-size:11px;font-weight:400;color:var(--gray);margin-top:3px">Removes all orders with status "Cancelled"</div>
+          </button>
+
+          <button onclick="clearOrders('all')"
+            style="background:rgba(230,48,18,.1);border:1px solid rgba(230,48,18,.3);color:var(--red-light);padding:13px 20px;border-radius:8px;cursor:pointer;font-family:var(--font-b);font-size:13px;font-weight:700;text-align:left;transition:all .2s"
+            onmouseover="this.style.background='rgba(230,48,18,.2)'"
+            onmouseout="this.style.background='rgba(230,48,18,.1)'">
+            ⚠️ Clear ALL Orders
+            <div style="font-size:11px;font-weight:400;color:var(--gray);margin-top:3px">Removes every order from the database permanently</div>
+          </button>
+        </div>
+        <div id="clear-orders-msg" style="margin-top:1rem;font-size:13px;text-align:center"></div>
+      </div>
+
       <!-- Admin Info -->
       <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem">
         <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:1.25rem">ADMIN INFO</h4>
@@ -2628,6 +2661,38 @@ function sendWhatsAppConfirmation(order) {
 
 // ── PAYSTACK PUBLIC KEY (safe to expose — never the secret key) ──
 window.PAYSTACK_PUBLIC_KEY = 'pk_test_YOUR_PUBLIC_KEY'; // ← Replace with your real key from paystack.com/dashboard
+
+// ── CLEAR ORDERS ─────────────────────────────────────────────
+async function clearOrders(type) {
+  var confirmMsg = {
+    'delivered': 'Delete all DELIVERED orders? This cannot be undone.',
+    'cancelled': 'Delete all CANCELLED orders? This cannot be undone.',
+    'all': 'DELETE ALL ORDERS? This will wipe your entire order history permanently. Are you sure?'
+  }[type];
+
+  if (!confirm(confirmMsg)) return;
+  if (type === 'all' && !confirm('Last warning — this deletes EVERYTHING. Continue?')) return;
+
+  var msg = document.getElementById('clear-orders-msg');
+  if (msg) { msg.style.color = 'var(--gray)'; msg.textContent = 'Clearing orders…'; }
+
+  try {
+    var res = await apiFetch('/orders/clear', {
+      method: 'DELETE',
+      body: JSON.stringify({ type: type })
+    });
+    if (res.success) {
+      if (msg) { msg.style.color = '#4CAF50'; msg.textContent = '✅ ' + res.message; }
+      toast('✅ ' + res.message);
+    } else {
+      if (msg) { msg.style.color = 'var(--red-light)'; msg.textContent = '❌ ' + res.message; }
+      toast('❌ ' + res.message);
+    }
+  } catch(e) {
+    if (msg) { msg.style.color = 'var(--red-light)'; msg.textContent = '❌ Could not clear orders.'; }
+    toast('❌ Could not clear orders.');
+  }
+}
 
 function savePaystackKey() {
   const key = document.getElementById('pk-input').value.trim();
