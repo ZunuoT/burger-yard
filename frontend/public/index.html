@@ -6,7 +6,6 @@
 <link rel="apple-touch-icon" href="/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Burger Yard — KNUST's Boldest Bites</title>
-<script src="https://js.paystack.co/v2/inline.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -643,11 +642,11 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
         </div>
         <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Payment Method</label>
         <div class="payment-methods">
-          <div class="pm-opt active" onclick="selectPayment('card',this)" data-method="card">
-            <div class="pm-icon">💳</div>
+          <div class="pm-opt active" onclick="selectPayment('momo',this)" data-method="momo">
+            <div class="pm-icon">📱</div>
             <div>
-              <div class="pm-label">Card / MoMo</div>
-              <div class="pm-sub">Pay securely via Paystack</div>
+              <div class="pm-label">Mobile Money (MoMo)</div>
+              <div class="pm-sub">Send to our MoMo number before pickup</div>
             </div>
             <div class="pm-check">✓</div>
           </div>
@@ -655,25 +654,28 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
             <div class="pm-icon">💵</div>
             <div>
               <div class="pm-label">Cash on Delivery</div>
-              <div class="pm-sub">Pay when your order arrives</div>
+              <div class="pm-sub">Pay cash when you collect or receive your order</div>
             </div>
             <div class="pm-check">✓</div>
           </div>
         </div>
-        <input type="hidden" id="f-payment" value="card">
-        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px;margin-top:1.25rem">Email (required for Paystack)</label>
-        <input class="fi" type="email" placeholder="your@email.com" id="f-email">
+        <input type="hidden" id="f-payment" value="momo">
+
+        <!-- MoMo instructions (shown when MoMo is selected) -->
+        <div id="momo-instructions" style="background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.25);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem">
+          <div style="font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--yellow);margin-bottom:.5rem">📱 MoMo Payment Instructions</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.7">
+            Send payment to: <strong style="color:var(--yellow)" id="momo-number">+233 XX XXX XXXX</strong><br>
+            Account name: <strong style="color:var(--yellow)">Burger Yard KNUST</strong><br>
+            <span style="font-size:12px;color:var(--gray)">Use your order number as reference. We will confirm receipt.</span>
+          </div>
+        </div>
+
         <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Special Instructions</label>
         <textarea class="fi" placeholder="Extra sauce? No onions? Let us know..." id="f-notes"></textarea>
-        <!-- Paystack pays, cash just saves order -->
         <button class="btn-red" id="place-order-btn" style="width:100%;justify-content:center;padding:16px" onclick="placeOrder()">
-          <span id="pay-btn-icon">🔒</span> <span id="pay-btn-text">Pay Now with Paystack</span>
+          <span id="pay-btn-icon">📱</span> <span id="pay-btn-text">Place Order (Pay via MoMo)</span>
         </button>
-        <div id="paystack-logos" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px;opacity:0.6">
-          <span style="font-size:11px;color:var(--gray)">Secured by</span>
-          <span style="font-size:13px;font-weight:800;color:var(--gray);letter-spacing:1px">PAYSTACK</span>
-          <span style="font-size:11px;color:var(--gray)">· Visa · MasterCard · MoMo</span>
-        </div>
       </div>
       <div>
         <div class="cart-panel">
@@ -765,7 +767,7 @@ let modalQty = 1;
 let adminToken = localStorage.getItem('by_admin_token');
 let selectedStar = 0;
 
-// ── API HELPERS ──────────────────────────────────────────────
+// --  -- API HELPERS --
 async function apiFetch(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   if (adminToken) headers['Authorization'] = `Bearer ${adminToken}`;
@@ -773,13 +775,8 @@ async function apiFetch(path, opts = {}) {
   return res.json();
 }
 
-// ── INIT ─────────────────────────────────────────────────────
+// --  -- INIT --
 document.addEventListener('DOMContentLoaded', async () => {
-  // Load Paystack public key from server config
-  try {
-    const cfg = await apiFetch('/config');
-    if (cfg.paystackPublicKey) window.PAYSTACK_PUBLIC_KEY = cfg.paystackPublicKey;
-  } catch {}
   await loadMenu();
   await loadReviews();
   await loadHeroStats();
@@ -787,7 +784,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCartUI();
 });
 
-// ── MENU ─────────────────────────────────────────────────────
+// --  -- MENU --
 async function loadMenu(cat = 'all') {
   const grid = document.getElementById('menu-grid');
   grid.innerHTML = '<div class="menu-loading">Loading menu…</div>';
@@ -834,7 +831,7 @@ function filterMenu(cat, btn) {
   renderMenu(items);
 }
 
-// ── MODAL ─────────────────────────────────────────────────────
+// --  -- MODAL --
 function openModal(id) {
   const item = allMenu.find(i => i._id === id);
   if (!item) return;
@@ -857,7 +854,7 @@ function addFromModal() {
 }
 function quickAdd(id) { const item = allMenu.find(i => i._id === id); if (item) addToCart(item); }
 
-// ── CART ──────────────────────────────────────────────────────
+// --  -- CART --
 function addToCart(item) {
   const ex = cart.find(c => c._id === item._id);
   if (ex) ex.quantity++;
@@ -911,167 +908,83 @@ function toggleDelivery() {
   updateCartUI();
 }
 
-// ── PAYMENT METHOD TOGGLE ────────────────────────────────────
+// --  -- PAYMENT METHOD TOGGLE --
 function selectPayment(method, el) {
   document.querySelectorAll('.pm-opt').forEach(o => o.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('f-payment').value = method;
-  const isCard = method === 'card';
-  document.getElementById('pay-btn-icon').textContent = isCard ? '🔒' : '🍔';
-  document.getElementById('pay-btn-text').textContent = isCard ? 'Pay Now with Paystack' : 'Place Order (Cash)';
-  document.getElementById('paystack-logos').style.display = isCard ? 'flex' : 'none';
-  document.getElementById('f-email').closest('div') || document.getElementById('f-email').parentElement;
-  document.getElementById('f-email').style.display = isCard ? 'block' : 'none';
-  document.getElementById('f-email').previousElementSibling.style.display = isCard ? 'block' : 'none';
+  var isMomo = method === 'momo';
+  document.getElementById('pay-btn-icon').textContent = isMomo ? '📱' : '🍔';
+  document.getElementById('pay-btn-text').textContent = isMomo ? 'Place Order (Pay via MoMo)' : 'Place Order (Cash on Delivery)';
+  var momoInstr = document.getElementById('momo-instructions');
+  if (momoInstr) momoInstr.style.display = isMomo ? 'block' : 'none';
 }
 
-// ── COLLECT & VALIDATE ORDER FIELDS ──────────────────────────
+// --  -- COLLECT & VALIDATE ORDER FIELDS --
 function collectOrderData() {
   const name = document.getElementById('f-name').value.trim();
   const phone = document.getElementById('f-phone').value.trim();
-  const email = document.getElementById('f-email').value.trim();
   const orderType = document.getElementById('f-type').value;
-  const deliveryLocation = document.getElementById('f-location')?.value.trim() || '';
+  const deliveryLocation = document.getElementById('f-location') ? document.getElementById('f-location').value.trim() : '';
   const specialInstructions = document.getElementById('f-notes').value.trim();
   const paymentMethod = document.getElementById('f-payment').value;
 
   if (!name || !phone || !orderType) { toast('⚠️ Please fill in Name, Phone and Order Type.'); return null; }
   if (!cart.length) { toast('🍔 Add items to your cart first!'); return null; }
-  if (paymentMethod === 'card' && !email) { toast('⚠️ Email is required for card/MoMo payment.'); return null; }
-  if (paymentMethod === 'card' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('⚠️ Enter a valid email address.'); return null; }
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const deliveryFee = orderType === 'delivery' ? 5 : 0;
   const total = subtotal + deliveryFee;
 
-  return { name, phone, email, orderType, deliveryLocation, specialInstructions, paymentMethod, subtotal, deliveryFee, total };
+  return { name, phone, orderType, deliveryLocation, specialInstructions, paymentMethod, subtotal, deliveryFee, total };
 }
 
-// ── PLACE ORDER ───────────────────────────────────────────────
+// --  -- PLACE ORDER --
 async function placeOrder() {
   const fields = collectOrderData();
   if (!fields) return;
-  const { paymentMethod } = fields;
-
-  if (paymentMethod === 'card') {
-    launchPaystack(fields);
-  } else {
-    await saveCashOrder(fields);
-  }
+  await saveOrder(fields);
 }
 
-// ── PAYSTACK POPUP ────────────────────────────────────────────
-function launchPaystack(fields) {
-  const { name, phone, email, total } = fields;
-  const publicKey = window.PAYSTACK_PUBLIC_KEY || '';
-
-  // If no real Paystack key is configured, fall back to saving as cash order
-  if (!publicKey || publicKey === 'pk_test_YOUR_PUBLIC_KEY' || publicKey.includes('YOUR')) {
-    toast('⚠️ Paystack not configured yet — saving as cash order.');
-    saveCashOrder(fields);
-    return;
-  }
-
-  // Check PaystackPop is loaded
-  if (typeof PaystackPop === 'undefined') {
-    toast('⚠️ Paystack failed to load — saving as cash order.');
-    saveCashOrder(fields);
-    return;
-  }
-
-  try {
-    const amountPesewas = Math.round(total * 100);
-    const reference = `BY-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-
-    const paystack = new PaystackPop();
-    paystack.newTransaction({
-      key: publicKey,
-      email: email,
-      amount: amountPesewas,
-      currency: 'GHS',
-      ref: reference,
-      label: 'Burger Yard KNUST',
-      metadata: {
-        custom_fields: [
-          { display_name: 'Customer Name', variable_name: 'customer_name', value: name },
-          { display_name: 'Phone', variable_name: 'phone', value: phone },
-          { display_name: 'Order Type', variable_name: 'order_type', value: fields.orderType },
-        ]
-      },
-      onSuccess: async (transaction) => {
-        toast('✅ Payment received! Confirming your order…');
-        setBtnLoading(true);
-        await verifyAndSaveOrder(fields, transaction.reference);
-        setBtnLoading(false);
-      },
-      onCancel: () => {
-        toast('ℹ️ Payment cancelled. Your cart is still saved.');
-      }
-    });
-  } catch (err) {
-    console.error('Paystack error:', err);
-    toast('⚠️ Payment error — saving as cash order.');
-    saveCashOrder(fields);
-  }
-}
-
+// --  -- SAVE ORDER (MoMo or Cash) --
 function setBtnLoading(loading) {
-  const btn = document.getElementById('place-order-btn');
+  var btn = document.getElementById('place-order-btn');
+  if (!btn) return;
   btn.disabled = loading;
-  document.getElementById('pay-btn-icon').textContent = loading ? '⏳' : '🔒';
-  document.getElementById('pay-btn-text').textContent = loading ? 'Confirming order…' : 'Pay Now with Paystack';
+  document.getElementById('pay-btn-icon').textContent = loading ? '⏳' : (document.getElementById('f-payment').value === 'momo' ? '📱' : '🍔');
+  document.getElementById('pay-btn-text').textContent = loading ? 'Placing order…' : (document.getElementById('f-payment').value === 'momo' ? 'Place Order (Pay via MoMo)' : 'Place Order (Cash on Delivery)');
 }
 
-// ── VERIFY PAYMENT & SAVE ORDER ───────────────────────────────
-async function verifyAndSaveOrder(fields, reference) {
-  const { name, phone, orderType, deliveryLocation, specialInstructions, subtotal, deliveryFee, total } = fields;
-  const orderData = {
-    customer: { name, phone },
-    items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
-    orderType, deliveryLocation, specialInstructions,
-    paymentMethod: 'card', subtotal, deliveryFee, total
-  };
-
-  try {
-    const res = await apiFetch('/payment/verify', {
-      method: 'POST',
-      body: JSON.stringify({ reference, orderData })
-    });
-    if (res.success) {
-      showOrderSuccess(res.data, reference);
-    } else {
-      toast('❌ ' + res.message);
-    }
-  } catch {
-    toast('❌ Could not confirm order. Contact us with reference: ' + reference);
-  }
-}
-
-// ── SAVE CASH ORDER ───────────────────────────────────────────
-async function saveCashOrder(fields) {
-  const { name, phone, orderType, deliveryLocation, specialInstructions, subtotal, deliveryFee, total } = fields;
-  const orderPayload = {
-    customer: { name, phone },
-    items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
-    orderType, deliveryLocation, specialInstructions,
-    paymentMethod: 'cash', subtotal, deliveryFee, total
+async function saveOrder(fields) {
+  var { name, phone, orderType, deliveryLocation, specialInstructions, paymentMethod, subtotal, deliveryFee, total } = fields;
+  var orderPayload = {
+    customer: { name: name, phone: phone },
+    items: cart.map(function(i) { return { name: i.name, price: i.price, quantity: i.quantity, image: i.image }; }),
+    orderType: orderType,
+    deliveryLocation: deliveryLocation,
+    specialInstructions: specialInstructions,
+    paymentMethod: paymentMethod,
+    paymentStatus: 'unpaid',
+    subtotal: subtotal,
+    deliveryFee: deliveryFee,
+    total: total
   };
   setBtnLoading(true);
   try {
-    const res = await apiFetch('/orders', { method: 'POST', body: JSON.stringify(orderPayload) });
+    var res = await apiFetch('/orders', { method: 'POST', body: JSON.stringify(orderPayload) });
     setBtnLoading(false);
     if (res.success) {
       showOrderSuccess(res.data, null);
     } else {
       toast('❌ ' + res.message);
     }
-  } catch {
+  } catch(e) {
     setBtnLoading(false);
     toast('❌ Could not place order. Please try again.');
   }
 }
 
-// ── ORDER SUCCESS SCREEN ──────────────────────────────────────
+// --  -- ORDER SUCCESS SCREEN --
 function showOrderSuccess(order, paystackRef) {
   const isPaid = order.paymentStatus === 'paid';
   const now = new Date();
@@ -1083,8 +996,18 @@ function showOrderSuccess(order, paystackRef) {
       <div style="font-size:80px;margin-bottom:1.5rem">🎉</div>
       <div style="font-family:var(--font-d);font-size:56px;letter-spacing:3px;color:var(--yellow);margin-bottom:.5rem">ORDER PLACED!</div>
       <div style="font-family:var(--font-d);font-size:28px;letter-spacing:2px;color:white;margin-bottom:2rem">${order.orderNumber}</div>
-      <div style="display:inline-flex;align-items:center;gap:8px;background:${isPaid ? 'rgba(46,125,50,.15)' : 'rgba(255,165,0,.15)'};border:1px solid ${isPaid ? 'rgba(46,125,50,.3)' : 'rgba(255,165,0,.3)'};color:${isPaid ? '#4CAF50' : 'orange'};font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:8px 20px;border-radius:100px;margin-bottom:2.5rem">
-        ${isPaid ? '✓ PAYMENT CONFIRMED' : '⏳ PAY ON ' + order.orderType.toUpperCase()}
+      ${order.paymentMethod === 'momo' && !isPaid ?
+        '<div style="background:rgba(255,214,0,.1);border:1px solid rgba(255,214,0,.3);border-radius:12px;padding:1.25rem 1.5rem;max-width:480px;margin:0 auto 2rem;text-align:left">' +
+        '<div style="font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--yellow);margin-bottom:.75rem">📱 Complete Your MoMo Payment</div>' +
+        '<div style="font-size:14px;color:rgba(255,255,255,.85);line-height:1.8">' +
+        'Send <strong style="color:var(--yellow)">GH₵' + order.total.toLocaleString() + '</strong> to:<br>' +
+        '<strong style="color:var(--yellow);font-size:18px" id="success-momo-num">+233 XX XXX XXXX</strong><br>' +
+        'Name: <strong>Burger Yard KNUST</strong><br>' +
+        '<span style="font-size:12px;color:var(--gray)">Use <strong style="color:white">' + order.orderNumber + '</strong> as your reference/narration</span>' +
+        '</div></div>'
+        : ''}
+      <div style="display:inline-flex;align-items:center;gap:8px;background:${isPaid ? 'rgba(46,125,50,.15)' : order.paymentMethod === 'momo' ? 'rgba(255,214,0,.15)' : 'rgba(255,165,0,.15)'};border:1px solid ${isPaid ? 'rgba(46,125,50,.3)' : order.paymentMethod === 'momo' ? 'rgba(255,214,0,.3)' : 'rgba(255,165,0,.3)'};color:${isPaid ? '#4CAF50' : order.paymentMethod === 'momo' ? 'var(--yellow)' : 'orange'};font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:8px 20px;border-radius:100px;margin-bottom:2.5rem">
+        ${isPaid ? '✓ PAYMENT CONFIRMED' : order.paymentMethod === 'momo' ? '📱 AWAITING MOMO PAYMENT' : '⏳ PAY CASH ON ' + order.orderType.toUpperCase()}
       </div>
 
       <!-- Order summary card -->
@@ -1123,7 +1046,7 @@ function showOrderSuccess(order, paystackRef) {
   scrollToSection('order-online');
 }
 
-// ── PRINT RECEIPT ─────────────────────────────────────────────
+// --  -- PRINT RECEIPT --
 function printReceipt(orderNum, name, phone, orderType, total, subtotal, deliveryFee, payStatus, dateStr, timeStr, items, location, paystackRef) {
   const receiptHTML = `
     <div id="receipt-printable" style="font-family:'Courier New',monospace;max-width:300px;margin:0 auto;padding:20px;color:#000;background:#fff">
@@ -1220,8 +1143,8 @@ function openPrintWindow(receiptHTML) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-// ── TRACK ORDER ───────────────────────────────────────────────
-// ── STAGE CONFIG ─────────────────────────────────────────────
+// --  -- TRACK ORDER --
+// --  -- STAGE CONFIG --
 const STAGE_CONFIG = {
   pending:   { icon:'⏳', label:'Order Received',      color:'#E63012', secs: 60,    next:'confirmed'  },
   confirmed: { icon:'✅', label:'Order Confirmed',     color:'#FF8C00', secs: 120,   next:'preparing'  },
@@ -1411,7 +1334,7 @@ function clearTracking() {
   currentTrackedOrder = null;
 }
 
-// ── REVIEWS ───────────────────────────────────────────────────
+// --  -- REVIEWS --
 async function loadReviews() {
   try {
     const res = await apiFetch('/reviews');
@@ -1464,7 +1387,7 @@ async function submitReview() {
   } catch { toast('❌ Could not submit review.'); }
 }
 
-// ── HERO STATS ────────────────────────────────────────────────
+// --  -- HERO STATS --
 async function loadHeroStats() {
   try {
     if (!adminToken) return;
@@ -1473,7 +1396,7 @@ async function loadHeroStats() {
   } catch {}
 }
 
-// ── ADMIN ─────────────────────────────────────────────────────
+// --  -- ADMIN --
 function openAdminLogin() { document.getElementById('admin-modal').classList.add('open'); }
 function closeAdminModal() { document.getElementById('admin-modal').classList.remove('open'); }
 
@@ -1569,7 +1492,7 @@ function updateRefreshIndicator(active) {
   }
 }
 
-// Silent refresh — updates data without wiping the whole panel
+// Silent refresh -- updates data without wiping the whole panel
 async function silentRefreshOrders() {
   try {
     const [ordersRes, statsRes] = await Promise.all([
@@ -1603,7 +1526,7 @@ async function silentRefreshOrders() {
       statEls[3].textContent = 'GH₵' + (stats.revenue || 0).toLocaleString();
     }
 
-    // Update order rows — only change status cells to avoid disrupting dropdowns in use
+    // Update order rows -- only change status cells to avoid disrupting dropdowns in use
     orders.forEach(o => {
       const row = document.getElementById('order-row-' + o._id);
       if (row) {
@@ -1613,7 +1536,7 @@ async function silentRefreshOrders() {
           sel.className = `s-badge s-${o.status}`;
         }
       } else {
-        // New row appeared — full re-render
+        // New row appeared -- full re-render
         renderOrdersTable(orders, stats);
       }
     });
@@ -1623,7 +1546,7 @@ async function silentRefreshOrders() {
     if (ts) ts.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
 
   } catch (err) {
-    // Silently fail — don't disrupt admin
+    // Silently fail -- don't disrupt admin
   }
 }
 
@@ -1690,7 +1613,7 @@ function buildOrdersHTML(orders, stats) {
                   <td style="font-size:12px;color:var(--gray)">${o.items.map(i=>i.name+' ×'+i.quantity).join(', ')}</td>
                   <td style="font-family:var(--font-d);font-size:16px;color:var(--yellow)">GH₵${o.total}</td>
                   <td style="text-transform:capitalize;font-size:13px">${o.orderType}</td>
-                  <td><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;background:${o.paymentStatus==='paid'?'rgba(46,125,50,.2)':'rgba(255,165,0,.15)'};color:${o.paymentStatus==='paid'?'#4CAF50':'orange'}">${o.paymentStatus==='paid'?'✓ PAID':'⏳ CASH'}</span></td>
+                  <td>${o.paymentStatus==='paid' ? '<span style=\"font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(46,125,50,.2);color:#4CAF50\">✓ PAID</span>' : o.paymentMethod==='momo' ? '<span style=\"font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(255,214,0,.15);color:var(--yellow)\">📱 MoMo Unpaid</span>' : '<span style=\"font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(255,165,0,.15);color:orange\">⏳ Cash</span>'}</td>
                   <td><span class="s-badge s-${o.status}">${o.status}</span></td>
                   <td style="font-size:12px;color:var(--gray)">${new Date(o.createdAt).toLocaleTimeString()}</td>
                 </tr>
@@ -1740,7 +1663,12 @@ function buildOrderCard(o) {
         </div>
         <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
           <span style="font-family:var(--font-d);font-size:22px;color:var(--yellow)">GH₵${o.total}</span>
-          <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:${o.paymentStatus==='paid'?'rgba(46,125,50,.2)':'rgba(255,165,0,.15)'};color:${o.paymentStatus==='paid'?'#4CAF50':'orange'}">${o.paymentStatus==='paid'?'✓ PAID':'⏳ CASH'}</span>
+          ${o.paymentStatus==='paid'
+            ? '<span style=\"font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;background:rgba(46,125,50,.2);color:#4CAF50\">✓ PAID</span>'
+            : o.paymentMethod==='momo'
+              ? '<button onclick=\"confirmMomoPayment(\'' + o._id + '\', this)\" style=\"background:rgba(255,214,0,.15);border:1px solid rgba(255,214,0,.4);color:var(--yellow);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800;font-family:var(--font-b)\">📱 Confirm MoMo</button>'
+              : '<span style=\"font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;background:rgba(255,165,0,.15);color:orange\">⏳ Cash</span>'
+          }
           <span style="font-size:12px;color:var(--gray)">${new Date(o.createdAt).toLocaleTimeString()}</span>
         </div>
       </div>
@@ -1808,7 +1736,7 @@ function buildOrderCard(o) {
   `;
 }
 
-// ── ADMIN PRINT RECEIPT ───────────────────────────────────────
+// --  -- ADMIN PRINT RECEIPT --
 function printAdminReceipt(o) {
   const now = new Date(o.createdAt || Date.now());
   const dateStr = now.toLocaleDateString('en-GH', { day:'numeric', month:'long', year:'numeric' });
@@ -1964,7 +1892,7 @@ async function updateOrderStatus(id, status, el) {
   }
 }
 
-// ── NEW ORDER SOUND ───────────────────────────────────────────
+// --  -- NEW ORDER SOUND --
 function playNewOrderSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1983,7 +1911,7 @@ function playNewOrderSound() {
   } catch {}
 }
 
-// ── FLASH BROWSER TAB TITLE ───────────────────────────────────
+// --  -- FLASH BROWSER TAB TITLE --
 let titleFlashInterval = null;
 function flashTitle(msg) {
   const orig = document.title;
@@ -2097,7 +2025,7 @@ async function loadAdminReviews() {
   `;
 }
 
-// ── UI HELPERS ────────────────────────────────────────────────
+// --  -- UI HELPERS --
 function openDrawer() { document.getElementById('cart-drawer').classList.add('open'); document.getElementById('drawer-ov').classList.add('open'); }
 function closeDrawer() { document.getElementById('cart-drawer').classList.remove('open'); document.getElementById('drawer-ov').classList.remove('open'); }
 function scrollToSection(id) { document.getElementById(id).scrollIntoView({ behavior: 'smooth' }); }
@@ -2128,7 +2056,7 @@ const trackObs = new IntersectionObserver(entries => {
 }, { threshold: 0.1 });
 trackObs.observe(document.getElementById('track'));
 
-// ── ADMIN SETTINGS ───────────────────────────────────────────
+// --  -- ADMIN SETTINGS --
 function loadAdminSettings() {
   const con = document.getElementById('admin-content');
   con.innerHTML = `
@@ -2156,17 +2084,18 @@ function loadAdminSettings() {
         <div id="pw-msg" style="margin-top:1rem;font-size:13px;text-align:center"></div>
       </div>
 
-      <!-- Paystack Keys -->
+      <!-- MoMo Number -->
       <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:1.5rem">
-        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:.4rem">PAYSTACK KEYS</h4>
-        <p style="font-size:12px;color:var(--gray);margin-bottom:1.5rem">Add your Paystack public key to enable card and MoMo payments. Get it from <a href="https://paystack.com/dashboard" target="_blank" style="color:var(--red)">paystack.com/dashboard</a></p>
-        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Public Key</label>
-        <input class="fi" type="text" id="pk-input" placeholder="pk_live_xxxxxxxxxx" style="margin-bottom:1rem">
-        <button class="btn-red" style="width:100%;justify-content:center;padding:12px" onclick="savePaystackKey()">Save Public Key</button>
-        <div id="pk-msg" style="margin-top:.75rem;font-size:12px;text-align:center;color:var(--gray)">
-          Current: <span id="pk-current" style="color:var(--yellow)">Not configured</span>
+        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:.4rem">📱 MOMO NUMBER</h4>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:1.5rem">This number shows to customers when they choose MoMo payment. Use the business MoMo number.</p>
+        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">MoMo Number</label>
+        <input class="fi" type="text" id="momo-setting-input" placeholder="e.g. 0241234567" style="margin-bottom:1rem">
+        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Account Name</label>
+        <input class="fi" type="text" id="momo-name-input" placeholder="e.g. Burger Yard KNUST" style="margin-bottom:1rem">
+        <button class="btn-red" style="width:100%;justify-content:center;padding:12px" onclick="saveMomoNumber()">Save MoMo Details</button>
+        <div id="momo-setting-msg" style="margin-top:.75rem;font-size:12px;text-align:center;color:var(--gray)">
+          Current: <span id="momo-current" style="color:var(--yellow)">Not set</span>
         </div>
-        <p style="font-size:11px;color:var(--gray);margin-top:.75rem">⚠️ The secret key must be added in your Render environment variables — never put it here.</p>
       </div>
 
       <!-- Clear Orders -->
@@ -2213,16 +2142,17 @@ function loadAdminSettings() {
     </div>
   `;
 
-  // Show current Paystack key status
-  const currentKey = window.PAYSTACK_PUBLIC_KEY || '';
-  const pkEl = document.getElementById('pk-current');
-  if (pkEl) {
-    if (currentKey && !currentKey.includes('YOUR')) {
-      pkEl.textContent = currentKey.slice(0,12) + '...' + currentKey.slice(-4);
-      pkEl.style.color = '#4CAF50';
-    } else {
-      pkEl.textContent = 'Not configured';
-    }
+  // Show current MoMo number
+  var savedMomo = localStorage.getItem('by_momo_number') || '';
+  var savedMomoName = localStorage.getItem('by_momo_name') || '';
+  var momoInput = document.getElementById('momo-setting-input');
+  var momoNameInput = document.getElementById('momo-name-input');
+  var momoCurrent = document.getElementById('momo-current');
+  if (momoInput && savedMomo) momoInput.value = savedMomo;
+  if (momoNameInput && savedMomoName) momoNameInput.value = savedMomoName;
+  if (momoCurrent) {
+    if (savedMomo) { momoCurrent.textContent = savedMomo; momoCurrent.style.color = '#4CAF50'; }
+    else momoCurrent.textContent = 'Not set';
   }
 
   // Show current admin email from token
@@ -2285,7 +2215,7 @@ async function changePassword() {
   }
 }
 
-// ── SALES REPORT ─────────────────────────────────────────────
+// --  -- SALES REPORT --
 async function loadSalesReport() {
   const con = document.getElementById('admin-content');
   con.innerHTML = '<div style="color:var(--gray);padding:2rem;text-align:center">Loading sales data…</div>';
@@ -2442,7 +2372,7 @@ async function loadSalesReport() {
   }
 }
 
-// ── MENU MANAGER ──────────────────────────────────────────────
+// --  -- MENU MANAGER --
 let editingItemId = null;
 
 async function loadMenuManager() {
@@ -2631,7 +2561,7 @@ async function deleteMenuItem(id, name) {
   }
 }
 
-// ── WHATSAPP ORDER CONFIRMATION ───────────────────────────────
+// --  -- WHATSAPP ORDER CONFIRMATION --
 function sendWhatsAppConfirmation(order) {
   var rawPhone = (order.customer.phone || '').replace(/[^0-9]/g, '');
   var waPhone = rawPhone.startsWith('233') ? rawPhone : rawPhone.startsWith('0') ? '233' + rawPhone.slice(1) : '233' + rawPhone;
@@ -2659,61 +2589,30 @@ function sendWhatsAppConfirmation(order) {
   window.open('https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
-// ── PAYSTACK PUBLIC KEY (safe to expose — never the secret key) ──
-window.PAYSTACK_PUBLIC_KEY = 'pk_test_YOUR_PUBLIC_KEY'; // ← Replace with your real key from paystack.com/dashboard
 
-// ── CLEAR ORDERS ─────────────────────────────────────────────
-async function clearOrders(type) {
-  var confirmMsg = {
-    'delivered': 'Delete all DELIVERED orders? This cannot be undone.',
-    'cancelled': 'Delete all CANCELLED orders? This cannot be undone.',
-    'all': 'DELETE ALL ORDERS? This will wipe your entire order history permanently. Are you sure?'
-  }[type];
-
-  if (!confirm(confirmMsg)) return;
-  if (type === 'all' && !confirm('Last warning — this deletes EVERYTHING. Continue?')) return;
-
-  var msg = document.getElementById('clear-orders-msg');
-  if (msg) { msg.style.color = 'var(--gray)'; msg.textContent = 'Clearing orders…'; }
-
-  try {
-    var res = await apiFetch('/orders/clear', {
-      method: 'DELETE',
-      body: JSON.stringify({ type: type })
-    });
-    if (res.success) {
-      if (msg) { msg.style.color = '#4CAF50'; msg.textContent = '✅ ' + res.message; }
-      toast('✅ ' + res.message);
-    } else {
-      if (msg) { msg.style.color = 'var(--red-light)'; msg.textContent = '❌ ' + res.message; }
-      toast('❌ ' + res.message);
-    }
-  } catch(e) {
-    if (msg) { msg.style.color = 'var(--red-light)'; msg.textContent = '❌ Could not clear orders.'; }
-    toast('❌ Could not clear orders.');
-  }
-}
-
-function savePaystackKey() {
-  const key = document.getElementById('pk-input').value.trim();
-  if (!key || (!key.startsWith('pk_live_') && !key.startsWith('pk_test_'))) {
-    toast('⚠️ Enter a valid Paystack public key (starts with pk_live_ or pk_test_)');
-    return;
-  }
-  window.PAYSTACK_PUBLIC_KEY = key;
-  localStorage.setItem('by_paystack_pk', key);
-  toast('✅ Paystack key saved! Payments are now active.');
-  const pkEl = document.getElementById('pk-current');
-  if (pkEl) { pkEl.textContent = key.slice(0,12) + '...' + key.slice(-4); pkEl.style.color = '#4CAF50'; }
-  const msg = document.getElementById('pk-msg');
+// --  -- MOMO NUMBER --
+function saveMomoNumber() {
+  var num = document.getElementById('momo-setting-input').value.trim();
+  var name = document.getElementById('momo-name-input').value.trim();
+  if (!num) { toast('⚠️ Please enter a MoMo number'); return; }
+  localStorage.setItem('by_momo_number', num);
+  localStorage.setItem('by_momo_name', name || 'Burger Yard KNUST');
+  applyMomoNumber();
+  toast('✅ MoMo details saved!');
+  var el = document.getElementById('momo-current');
+  if (el) { el.textContent = num; el.style.color = '#4CAF50'; }
+  var msg = document.getElementById('momo-setting-msg');
   if (msg) msg.innerHTML = 'Status: <span style="color:#4CAF50;font-weight:700">✅ Active</span>';
 }
 
-// Load saved Paystack key from localStorage on startup
-(function() {
-  const saved = localStorage.getItem('by_paystack_pk');
-  if (saved) window.PAYSTACK_PUBLIC_KEY = saved;
-})();
+function applyMomoNumber() {
+  var num = localStorage.getItem('by_momo_number') || '+233 XX XXX XXXX';
+  var els = document.querySelectorAll('#momo-number, #success-momo-num');
+  els.forEach(function(el) { el.textContent = num; });
+}
+
+// Load saved MoMo number on startup
+(function() { applyMomoNumber(); })();
 </script>
 </body>
 </html>

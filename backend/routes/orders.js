@@ -128,6 +128,27 @@ router.patch('/:id/status', protect, async (req, res) => {
   }
 });
 
+// PATCH confirm momo payment (admin)
+router.patch('/:id/confirm-payment', protect, async (req, res) => {
+  try {
+    if (isDBConnected()) {
+      const order = await Order.findByIdAndUpdate(
+        req.params.id,
+        { paymentStatus: 'paid' },
+        { new: true }
+      );
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+      return res.json({ success: true, data: order, message: 'MoMo payment confirmed' });
+    }
+    const order = inMemoryOrders.find(o => o._id === req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    order.paymentStatus = 'paid';
+    res.json({ success: true, data: order, message: 'MoMo payment confirmed' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // DELETE clear orders (admin)
 router.delete('/clear', protect, async (req, res) => {
   try {
