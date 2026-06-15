@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="https://js.paystack.co/v2/inline.js"></script>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -646,7 +647,7 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
             <div class="pm-icon">📱</div>
             <div>
               <div class="pm-label">Mobile Money (MoMo)</div>
-              <div class="pm-sub">Send to our MoMo number before pickup</div>
+              <div class="pm-sub">MTN · Vodafone · AirtelTigo — pay with PIN prompt</div>
             </div>
             <div class="pm-check">✓</div>
           </div>
@@ -661,21 +662,23 @@ footer{background:var(--off-black);border-top:1px solid var(--border);padding:4r
         </div>
         <input type="hidden" id="f-payment" value="momo">
 
-        <!-- MoMo instructions (shown when MoMo is selected) -->
-        <div id="momo-instructions" style="background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.25);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem">
-          <div style="font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--yellow);margin-bottom:.5rem">📱 MoMo Payment Instructions</div>
-          <div style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.7">
-            Send payment to: <strong style="color:var(--yellow)" id="momo-number">+233 XX XXX XXXX</strong><br>
-            Account name: <strong style="color:var(--yellow)">Burger Yard KNUST</strong><br>
-            <span style="font-size:12px;color:var(--gray)">Use your order number as reference. We will confirm receipt.</span>
-          </div>
+        <!-- MoMo phone field (shown when MoMo selected) -->
+        <div id="momo-phone-field">
+          <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">MoMo Phone Number</label>
+          <input class="fi" type="tel" id="f-momo-phone" placeholder="e.g. 0241234567" style="margin-bottom:.5rem">
+          <div style="font-size:11px;color:var(--gray);margin-bottom:1.25rem">You will receive a payment prompt on this number. Enter your PIN to confirm.</div>
         </div>
 
         <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Special Instructions</label>
         <textarea class="fi" placeholder="Extra sauce? No onions? Let us know..." id="f-notes"></textarea>
         <button class="btn-red" id="place-order-btn" style="width:100%;justify-content:center;padding:16px" onclick="placeOrder()">
-          <span id="pay-btn-icon">📱</span> <span id="pay-btn-text">Place Order (Pay via MoMo)</span>
+          <span id="pay-btn-icon">📱</span> <span id="pay-btn-text">Pay with MoMo</span>
         </button>
+        <div id="paystack-logos" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px;opacity:0.5">
+          <span style="font-size:11px;color:var(--gray)">Secured by</span>
+          <span style="font-size:13px;font-weight:800;color:var(--gray);letter-spacing:1px">PAYSTACK</span>
+          <span style="font-size:11px;color:var(--gray)">· MTN · Vodafone · AirtelTigo</span>
+        </div>
       </div>
       <div>
         <div class="cart-panel">
@@ -908,66 +911,158 @@ function toggleDelivery() {
   updateCartUI();
 }
 
-// --  -- PAYMENT METHOD TOGGLE --
+// -- PAYMENT METHOD TOGGLE --
 function selectPayment(method, el) {
-  document.querySelectorAll('.pm-opt').forEach(o => o.classList.remove('active'));
+  document.querySelectorAll('.pm-opt').forEach(function(o) { o.classList.remove('active'); });
   el.classList.add('active');
   document.getElementById('f-payment').value = method;
   var isMomo = method === 'momo';
   document.getElementById('pay-btn-icon').textContent = isMomo ? '📱' : '🍔';
-  document.getElementById('pay-btn-text').textContent = isMomo ? 'Place Order (Pay via MoMo)' : 'Place Order (Cash on Delivery)';
-  var momoInstr = document.getElementById('momo-instructions');
-  if (momoInstr) momoInstr.style.display = isMomo ? 'block' : 'none';
+  document.getElementById('pay-btn-text').textContent = isMomo ? 'Pay with MoMo' : 'Place Order (Cash on Delivery)';
+  var momoField = document.getElementById('momo-phone-field');
+  if (momoField) momoField.style.display = isMomo ? 'block' : 'none';
+  var logoBar = document.getElementById('paystack-logos');
+  if (logoBar) logoBar.style.display = isMomo ? 'flex' : 'none';
 }
 
-// --  -- COLLECT & VALIDATE ORDER FIELDS --
+// -- COLLECT & VALIDATE ORDER FIELDS --
 function collectOrderData() {
-  const name = document.getElementById('f-name').value.trim();
-  const phone = document.getElementById('f-phone').value.trim();
-  const orderType = document.getElementById('f-type').value;
-  const deliveryLocation = document.getElementById('f-location') ? document.getElementById('f-location').value.trim() : '';
-  const specialInstructions = document.getElementById('f-notes').value.trim();
-  const paymentMethod = document.getElementById('f-payment').value;
+  var name = document.getElementById('f-name').value.trim();
+  var phone = document.getElementById('f-phone').value.trim();
+  var orderType = document.getElementById('f-type').value;
+  var deliveryLocation = document.getElementById('f-location') ? document.getElementById('f-location').value.trim() : '';
+  var specialInstructions = document.getElementById('f-notes').value.trim();
+  var paymentMethod = document.getElementById('f-payment').value;
+  var momoPhone = document.getElementById('f-momo-phone') ? document.getElementById('f-momo-phone').value.trim() : '';
 
   if (!name || !phone || !orderType) { toast('⚠️ Please fill in Name, Phone and Order Type.'); return null; }
   if (!cart.length) { toast('🍔 Add items to your cart first!'); return null; }
+  if (paymentMethod === 'momo' && !momoPhone) { toast('⚠️ Please enter your MoMo phone number.'); return null; }
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const deliveryFee = orderType === 'delivery' ? 5 : 0;
-  const total = subtotal + deliveryFee;
+  var subtotal = cart.reduce(function(s, i) { return s + i.price * i.quantity; }, 0);
+  var deliveryFee = orderType === 'delivery' ? 5 : 0;
+  var total = subtotal + deliveryFee;
 
-  return { name, phone, orderType, deliveryLocation, specialInstructions, paymentMethod, subtotal, deliveryFee, total };
+  return { name: name, phone: phone, momoPhone: momoPhone, orderType: orderType,
+           deliveryLocation: deliveryLocation, specialInstructions: specialInstructions,
+           paymentMethod: paymentMethod, subtotal: subtotal, deliveryFee: deliveryFee, total: total };
 }
 
-// --  -- PLACE ORDER --
+// -- PLACE ORDER --
 async function placeOrder() {
-  const fields = collectOrderData();
+  var fields = collectOrderData();
   if (!fields) return;
-  await saveOrder(fields);
+  if (fields.paymentMethod === 'momo') {
+    launchPaystackMomo(fields);
+  } else {
+    await saveCashOrder(fields);
+  }
 }
 
-// --  -- SAVE ORDER (MoMo or Cash) --
+// -- SET BUTTON LOADING --
 function setBtnLoading(loading) {
   var btn = document.getElementById('place-order-btn');
   if (!btn) return;
   btn.disabled = loading;
-  document.getElementById('pay-btn-icon').textContent = loading ? '⏳' : (document.getElementById('f-payment').value === 'momo' ? '📱' : '🍔');
-  document.getElementById('pay-btn-text').textContent = loading ? 'Placing order…' : (document.getElementById('f-payment').value === 'momo' ? 'Place Order (Pay via MoMo)' : 'Place Order (Cash on Delivery)');
+  var method = document.getElementById('f-payment').value;
+  document.getElementById('pay-btn-icon').textContent = loading ? '⏳' : (method === 'momo' ? '📱' : '🍔');
+  document.getElementById('pay-btn-text').textContent = loading ? 'Processing…' : (method === 'momo' ? 'Pay with MoMo' : 'Place Order (Cash on Delivery)');
 }
 
-async function saveOrder(fields) {
-  var { name, phone, orderType, deliveryLocation, specialInstructions, paymentMethod, subtotal, deliveryFee, total } = fields;
-  var orderPayload = {
-    customer: { name: name, phone: phone },
+// -- PAYSTACK MOMO PUSH --
+function launchPaystackMomo(fields) {
+  var publicKey = window.PAYSTACK_PUBLIC_KEY || localStorage.getItem('by_paystack_pk') || '';
+  if (!publicKey || publicKey.includes('YOUR')) {
+    toast('⚠️ Paystack not configured. Contact admin.');
+    return;
+  }
+  if (typeof PaystackPop === 'undefined') {
+    toast('⚠️ Payment system failed to load. Try again.');
+    return;
+  }
+
+  var amountPesewas = Math.round(fields.total * 100);
+  var reference = 'BY-' + Date.now();
+  var momoPhone = fields.momoPhone.replace(/[^0-9]/g, '');
+  if (momoPhone.startsWith('0')) momoPhone = '233' + momoPhone.slice(1);
+
+  setBtnLoading(true);
+
+  try {
+    var paystack = new PaystackPop();
+    paystack.newTransaction({
+      key: publicKey,
+      amount: amountPesewas,
+      currency: 'GHS',
+      ref: reference,
+      // MoMo push - pre-fill phone and set channel to mobile_money
+      phone: momoPhone,
+      channels: ['mobile_money'],
+      label: 'Burger Yard KNUST',
+      metadata: {
+        custom_fields: [
+          { display_name: 'Customer', variable_name: 'customer_name', value: fields.name },
+          { display_name: 'Order Phone', variable_name: 'order_phone', value: fields.phone },
+          { display_name: 'Order Type', variable_name: 'order_type', value: fields.orderType }
+        ]
+      },
+      onSuccess: async function(transaction) {
+        toast('✅ MoMo payment confirmed! Saving your order…');
+        await verifyAndSaveOrder(fields, transaction.reference);
+        setBtnLoading(false);
+      },
+      onCancel: function() {
+        setBtnLoading(false);
+        toast('ℹ️ Payment cancelled. Your cart is saved.');
+      }
+    });
+  } catch(err) {
+    setBtnLoading(false);
+    toast('❌ Payment error: ' + err.message);
+  }
+}
+
+// -- VERIFY PAYMENT & SAVE ORDER --
+async function verifyAndSaveOrder(fields, reference) {
+  var orderData = {
+    customer: { name: fields.name, phone: fields.phone },
     items: cart.map(function(i) { return { name: i.name, price: i.price, quantity: i.quantity, image: i.image }; }),
-    orderType: orderType,
-    deliveryLocation: deliveryLocation,
-    specialInstructions: specialInstructions,
-    paymentMethod: paymentMethod,
+    orderType: fields.orderType,
+    deliveryLocation: fields.deliveryLocation,
+    specialInstructions: fields.specialInstructions,
+    paymentMethod: 'momo',
+    subtotal: fields.subtotal,
+    deliveryFee: fields.deliveryFee,
+    total: fields.total
+  };
+  try {
+    var res = await apiFetch('/payment/verify', {
+      method: 'POST',
+      body: JSON.stringify({ reference: reference, orderData: orderData })
+    });
+    if (res.success) {
+      showOrderSuccess(res.data, reference);
+    } else {
+      toast('❌ ' + res.message);
+    }
+  } catch(e) {
+    toast('❌ Could not save order. Contact us with ref: ' + reference);
+  }
+}
+
+// -- SAVE CASH ORDER --
+async function saveCashOrder(fields) {
+  var orderPayload = {
+    customer: { name: fields.name, phone: fields.phone },
+    items: cart.map(function(i) { return { name: i.name, price: i.price, quantity: i.quantity, image: i.image }; }),
+    orderType: fields.orderType,
+    deliveryLocation: fields.deliveryLocation,
+    specialInstructions: fields.specialInstructions,
+    paymentMethod: 'cash',
     paymentStatus: 'unpaid',
-    subtotal: subtotal,
-    deliveryFee: deliveryFee,
-    total: total
+    subtotal: fields.subtotal,
+    deliveryFee: fields.deliveryFee,
+    total: fields.total
   };
   setBtnLoading(true);
   try {
@@ -983,6 +1078,7 @@ async function saveOrder(fields) {
     toast('❌ Could not place order. Please try again.');
   }
 }
+
 
 // --  -- ORDER SUCCESS SCREEN --
 function showOrderSuccess(order, paystackRef) {
@@ -2084,18 +2180,17 @@ function loadAdminSettings() {
         <div id="pw-msg" style="margin-top:1rem;font-size:13px;text-align:center"></div>
       </div>
 
-      <!-- MoMo Number -->
+      <!-- Paystack Keys -->
       <div style="background:var(--black);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:1.5rem">
-        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:.4rem">📱 MOMO NUMBER</h4>
-        <p style="font-size:12px;color:var(--gray);margin-bottom:1.5rem">This number shows to customers when they choose MoMo payment. Use the business MoMo number.</p>
-        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">MoMo Number</label>
-        <input class="fi" type="text" id="momo-setting-input" placeholder="e.g. 0241234567" style="margin-bottom:1rem">
-        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Account Name</label>
-        <input class="fi" type="text" id="momo-name-input" placeholder="e.g. Burger Yard KNUST" style="margin-bottom:1rem">
-        <button class="btn-red" style="width:100%;justify-content:center;padding:12px" onclick="saveMomoNumber()">Save MoMo Details</button>
-        <div id="momo-setting-msg" style="margin-top:.75rem;font-size:12px;text-align:center;color:var(--gray)">
-          Current: <span id="momo-current" style="color:var(--yellow)">Not set</span>
+        <h4 style="font-family:var(--font-d);font-size:22px;letter-spacing:2px;margin-bottom:.4rem">💳 PAYSTACK KEY</h4>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:1.5rem">Required for MoMo push payments. Get your public key from <a href="https://paystack.com/dashboard" target="_blank" style="color:var(--red)">paystack.com/dashboard</a> → Settings → API Keys.</p>
+        <label style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:7px">Public Key</label>
+        <input class="fi" type="text" id="pk-input" placeholder="pk_live_xxxxxxxxxxxxxxxxxx" style="margin-bottom:1rem">
+        <button class="btn-red" style="width:100%;justify-content:center;padding:12px" onclick="savePaystackKey()">Save Public Key</button>
+        <div id="pk-msg" style="margin-top:.75rem;font-size:12px;text-align:center;color:var(--gray)">
+          Status: <span id="pk-current" style="color:var(--yellow)">Not configured</span>
         </div>
+        <p style="font-size:11px;color:var(--gray);margin-top:.75rem">⚠️ Only paste the Public Key here. Add the Secret Key in Render environment variables.</p>
       </div>
 
       <!-- Clear Orders -->
@@ -2142,17 +2237,19 @@ function loadAdminSettings() {
     </div>
   `;
 
-  // Show current MoMo number
-  var savedMomo = localStorage.getItem('by_momo_number') || '';
-  var savedMomoName = localStorage.getItem('by_momo_name') || '';
-  var momoInput = document.getElementById('momo-setting-input');
-  var momoNameInput = document.getElementById('momo-name-input');
-  var momoCurrent = document.getElementById('momo-current');
-  if (momoInput && savedMomo) momoInput.value = savedMomo;
-  if (momoNameInput && savedMomoName) momoNameInput.value = savedMomoName;
-  if (momoCurrent) {
-    if (savedMomo) { momoCurrent.textContent = savedMomo; momoCurrent.style.color = '#4CAF50'; }
-    else momoCurrent.textContent = 'Not set';
+  // Show current Paystack key status
+  var savedPk = localStorage.getItem('by_paystack_pk') || window.PAYSTACK_PUBLIC_KEY || '';
+  var pkInput = document.getElementById('pk-input');
+  var pkCurrent = document.getElementById('pk-current');
+  if (pkInput && savedPk && !savedPk.includes('YOUR')) pkInput.value = savedPk;
+  if (pkCurrent) {
+    if (savedPk && !savedPk.includes('YOUR')) {
+      pkCurrent.textContent = savedPk.slice(0,12) + '...' + savedPk.slice(-4);
+      pkCurrent.style.color = '#4CAF50';
+    } else {
+      pkCurrent.textContent = 'Not configured';
+      pkCurrent.style.color = 'orange';
+    }
   }
 
   // Show current admin email from token
@@ -2590,29 +2687,25 @@ function sendWhatsAppConfirmation(order) {
 }
 
 
-// --  -- MOMO NUMBER --
-function saveMomoNumber() {
-  var num = document.getElementById('momo-setting-input').value.trim();
-  var name = document.getElementById('momo-name-input').value.trim();
-  if (!num) { toast('⚠️ Please enter a MoMo number'); return; }
-  localStorage.setItem('by_momo_number', num);
-  localStorage.setItem('by_momo_name', name || 'Burger Yard KNUST');
-  applyMomoNumber();
-  toast('✅ MoMo details saved!');
-  var el = document.getElementById('momo-current');
-  if (el) { el.textContent = num; el.style.color = '#4CAF50'; }
-  var msg = document.getElementById('momo-setting-msg');
-  if (msg) msg.innerHTML = 'Status: <span style="color:#4CAF50;font-weight:700">✅ Active</span>';
+// -- PAYSTACK KEY MANAGEMENT --
+function savePaystackKey() {
+  var key = document.getElementById('pk-input').value.trim();
+  if (!key || (!key.startsWith('pk_live_') && !key.startsWith('pk_test_'))) {
+    toast('⚠️ Enter a valid Paystack public key (pk_live_ or pk_test_)');
+    return;
+  }
+  window.PAYSTACK_PUBLIC_KEY = key;
+  localStorage.setItem('by_paystack_pk', key);
+  toast('✅ Paystack key saved! MoMo payments are now active.');
+  var el = document.getElementById('pk-current');
+  if (el) { el.textContent = key.slice(0,12) + '...' + key.slice(-4); el.style.color = '#4CAF50'; }
 }
 
-function applyMomoNumber() {
-  var num = localStorage.getItem('by_momo_number') || '+233 XX XXX XXXX';
-  var els = document.querySelectorAll('#momo-number, #success-momo-num');
-  els.forEach(function(el) { el.textContent = num; });
-}
-
-// Load saved MoMo number on startup
-(function() { applyMomoNumber(); })();
+// Load saved Paystack key on startup
+(function() {
+  var saved = localStorage.getItem('by_paystack_pk');
+  if (saved) window.PAYSTACK_PUBLIC_KEY = saved;
+})();
 </script>
 </body>
 </html>
